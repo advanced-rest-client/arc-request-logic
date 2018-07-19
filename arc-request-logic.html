@@ -1,0 +1,476 @@
+<!--
+@license
+Copyright 2018 The Advanced REST client authors <arc@mulesoft.com>
+Licensed under the Apache License, Version 2.0 (the "License"); you may not
+use this file except in compliance with the License. You may obtain a copy of
+the License at
+http://www.apache.org/licenses/LICENSE-2.0
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
+WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
+License for the specific language governing permissions and limitations under
+the License.
+-->
+<link rel="import" href="../polymer/polymer-element.html">
+<link rel="import" href="../events-target-behavior/events-target-behavior.html">
+<link rel="import" href="../variables-evaluator/variables-evaluator.html">
+<script>
+/**
+ * `arc-request-logic`
+ *
+ * A request logic for Advanced REST Client excluding HTTP transport.
+ *
+ * ## Styling
+ *
+ * `<arc-request-logic>` provides the following custom properties and mixins for styling:
+ *
+ * Custom property | Description | Default
+ * ----------------|-------------|----------
+ * `--arc-request-logic` | Mixin applied to this elment | `{}`
+ *
+ * @customElement
+ * @polymer
+ * @demo demo/index.html
+ * @memberof ApiElements
+ */
+class ArcRequestLogic extends ArcBehaviors.EventsTargetBehavior(Polymer.Element) {
+  static get is() { return 'arc-request-logic'; }
+  static get properties() {
+    return {
+      /**
+       * Number of milliseconds after which the `before-request` event handlers
+       * will be cancelled and the request continue without waiting for the
+       * result. When set to `0`, `null`, `undefined` or `false` the timeoout
+       * is not applied and the element waits with the request until
+       * `continue-request` event is fired.
+       */
+      handlersTimeout: {
+        type: Number,
+        value: 2000
+      },
+      /**
+       * A map of currently handled requests.
+       * Keys are requests IDs generated in the request editor.
+       * @type {Object}
+       */
+      _queue: {
+        type: Object,
+        value() {
+          return {};
+        }
+      }
+    };
+  }
+
+  static get template() {
+    const template = document.createElement('template');
+    return template;
+  }
+
+  get evalElement() {
+    if (!this.$) {
+      this.$ = {};
+    }
+    if (!this.$.eval) {
+      this.$.eval = document.createElement('variables-evaluator');
+      this.$.eval.noBeforeRequest = true;
+      this.$.eval.eventTarget = this.eventsTarget;
+      this.shadowRoot.appendChild(this.$.eval);
+    }
+    return this.$.eval;
+  }
+
+  constructor() {
+    super();
+    this._apiRequestHandler = this._apiRequestHandler.bind(this);
+    this._continueRequestHandler = this._continueRequestHandler.bind(this);
+    this._resendHandler = this._resendHandler.bind(this);
+    this._reportHandler = this._reportHandler.bind(this);
+  }
+
+  _attachListeners(node) {
+    node.addEventListener('api-request', this._apiRequestHandler);
+    node.addEventListener('continue-request', this._continueRequestHandler);
+    node.addEventListener('resend-auth-request', this._resendHandler);
+    node.addEventListener('report-response', this._reportHandler);
+  }
+
+  _detachListeners(node) {
+    node.removeEventListener('api-request', this._apiRequestHandler);
+    node.removeEventListener('continue-request', this._continueRequestHandler);
+    node.removeEventListener('resend-auth-request', this._resendHandler);
+    node.removeEventListener('report-response', this._reportHandler);
+  }
+  /**
+   * A handler for the `api-request` event. It processes the request
+   * and sends it to the transport library.
+   * @param {CustomEvent} e
+   */
+  _apiRequestHandler(e) {
+    e.preventDefault();
+    e.stopPropagation();
+    e.stopImmediatePropagation();
+    const request = e.detail;
+    this.processRequest(request);
+  }
+  /**
+   * Processes the request by executing request actions and evaluating
+   * variables. When ready it sends the request to the transport.
+   * @param {Object} request ARC request object
+   * @return {Promise}
+   */
+  processRequest(request) {
+    const copy = this._prepareEventRequest(request);
+    this._queue[copy.id] = copy;
+    return this._beforeProcessVariables(request);
+  }
+  /**
+   * Prepares a request object to be used to send it with the `before-request`
+   * event. This is a "shallow" copy of the `request` property. It only creates
+   * a copy of the primitive values of the object. If the `payload` is an
+   * object (`FormData` or `File`) then it will be passed by reference instead
+   * of copying the object.
+   *
+   * It adds `promises` property to the object that is required by the
+   * `before-request` event.
+   *
+   * @param {Object} request ARC request object
+   * @return {Object} Copy of the `request` property.
+   */
+  _prepareEventRequest(request) {
+    const shallowCopy = Object.assign({}, request);
+    shallowCopy.promises = [];
+    if (['GET', 'HEAD'].indexOf(request.method) !== -1) {
+      delete shallowCopy.payload;
+    }
+    return shallowCopy;
+  }
+
+  /**
+   * Before the request object can be sent to any `before-request` handler
+   * it must be first evaluated by variables evaluator. It is the only way to
+   * ensure that the handler will receive actuall request data.
+   *
+   * @param {Object} request ARC request object
+   * @return {Promise}
+   */
+  _beforeProcessVariables(request) {
+    return this._preparePreRequestVariables(request)
+    .then((override) => {
+      this._notifyVariablesChange(override);
+      return this.evalElement.processBeforeRequest(request, override);
+    })
+    .then((request) => this._beforeRequest(request))
+    .catch(() => this._beforeRequest(request));
+  }
+  /**
+   * Prepares scripts context override values for variables evaluator.
+   * If there are actions defined for the `beforeRequest` key then it will
+   * get list of variables and create the override object.
+   *
+   * @param {Object} request ARC request object
+   * @return {Promise} Promise resolved to an object of variables
+   * or undefined if actions not defined.
+   */
+  _preparePreRequestVariables(request) {
+    const actions = request.requestActions;
+    if (!actions) {
+      return Promise.resolve();
+    }
+    const vars = actions.variables;
+    if (!vars || !vars.length) {
+      return Promise.resolve();
+    }
+    const result = {};
+    vars.forEach((item) => {
+      if (item.enabled === false) {
+        return;
+      }
+      result[item.variable] = item.value;
+    });
+    const _eval = this.evalElement;
+    return _eval.evaluateVariables(result);
+  }
+  /**
+   * Notifies
+   * @param {[type]} obj [description]
+   * @return {[type]} [description]
+   */
+  _notifyVariablesChange(obj) {
+    if (!obj) {
+      return;
+    }
+    Object.keys(obj).forEach((key) => {
+      const detail = {
+        variable: key,
+        value: obj[key]
+      };
+      this.dispatchEvent(new CustomEvent('variable-update-action', {
+        composed: true,
+        bubbles: true,
+        detail
+      }));
+    });
+  }
+  /**
+   * Handles the before request logic.
+   * @param {Object} request The request object.
+   */
+  _beforeRequest(request) {
+    const ID = request.id;
+    const bre = new CustomEvent('before-request', {
+      composed: true,
+      bubbles: true,
+      cancelable: true,
+      detail: request
+    });
+    this.dispatchEvent(bre);
+    if (bre.defaultPrevented) {
+      return this._reportCancelation(bre.detail.reason);
+    }
+    let p = bre.detail.promises;
+    if (p && p.length) {
+      this._queue[ID]._beforePromisesResolved = false;
+      const timeout = this._computeHandlersTimeout(p);
+      p = Promise.all(p);
+      if (timeout > 0) {
+        this._queue[ID]._currentTimeout =
+          window.setTimeout(() => this._onBeforeRequestTimeout(ID), timeout);
+      } else {
+        this._queue[ID]._awaitingContinue = true;
+      }
+    } else {
+      p = Promise.resolve();
+    }
+    p.then(() => {
+      this._queue[ID]._beforePromisesResolved = true;
+      if (this._queue[ID]._beforeTimedOut || this._queue[ID]._cancelled) {
+        return;
+      }
+      if (!this._queue[ID]._awaitingContinue) {
+        this._continueRequest(request);
+      }
+    })
+    .catch((cause) => {
+      this._reportError(ID, cause);
+      console.warn(cause);
+    });
+  }
+
+  _reportError(id, cause) {
+    const request = this._queue[id];
+    if (!request) {
+      return;
+    }
+    this.dispatchEvent(new CustomEvent('api-response', {
+      bubbles: true,
+      composed: true,
+      detail: {
+        isError: true,
+        error: cause,
+        loadingTime: 0,
+        request
+      }
+    }));
+  }
+  /**
+   * Computes timeout for the before-request event handlers.
+   * It reads a `timeout` property from a promise. If set, it returns a highest
+   * value for the timeout or default value defined in the `handlersTimeout`
+   * property. If `handlersTimeout` is falsy or any timeout property equals
+   * zero (`0`) then this function returns -1 meaning no timeout.
+   *
+   * @param {Array} promises Array of promises returned by the handlers.
+   * @return {Number} -1 for no timeout or positive number of milliseconds
+   * for the `before-request` event to be handled by all handlers.
+   */
+  _computeHandlersTimeout(promises) {
+    let timeout = this.handlersTimeout;
+    if (!timeout) {
+      return -1;
+    }
+    if (!promises || !promises.length) {
+      return timeout;
+    }
+    for (let i = 0, len = promises.length; i < len; i++) {
+      if (promises[i].timeout !== undefined) {
+        if (promises[i].timeout === 0) {
+          return -1;
+        }
+        if (promises[i].timeout > timeout) {
+          timeout = promises[i].timeout;
+        }
+      }
+    }
+    if (timeout === 0) {
+      timeout = -1;
+    }
+    return timeout;
+  }
+  /**
+   * Clears the before-request timeout timer.
+   * @param {String} id Request ID
+   */
+  _clearBeforeRequestTimeout(id) {
+    if (this._queue[id]._currentTimeout) {
+      window.clearTimeout(this._queue[id]._currentTimeout);
+      this._queue[id]._currentTimeout = undefined;
+    }
+  }
+  /**
+   * Called when the `before-request` timeout fired.
+   * It continues the request with current values in the `_requestCopy`
+   * property that has been sent with the `before-request` event.
+   *
+   * @param {String} id Request ID
+   */
+  _onBeforeRequestTimeout(id) {
+    this._queue[id]._currentTimeout = undefined;
+    this._queue[id]._beforeTimedOut = true;
+    console.warn('The before-request event handlers timed out.');
+    this._continueRequest(this._queue[id]);
+  }
+  /**
+   * Handler for `continue-request` custom event.
+   * @param {[type]} e [description]
+   * @return {[type]} [description]
+   */
+  _continueRequestHandler(e) {
+    const request = this._queue[e.detail.id];
+    if (!request) {
+      return;
+    }
+    this.continueRequest(request);
+  }
+  /**
+   * It continues the request flow if all promises for the `before-request`
+   * has been resolved.
+   * It do nothing if current request doesn't expect this event to be handled
+   * (no timeout set to 0).
+   *
+   * @param {Object} request ARC request object
+   */
+  continueRequest(request) {
+    if (!request._awaitingContinue) {
+      return;
+    }
+    if (!request._beforePromisesResolved) {
+      this._awaitingContinue = false;
+      return;
+    }
+    this._continueRequest(request);
+  }
+
+  /**
+   * Called when before request block finished (whatever the output) and the
+   * request can now be send to the transport library.
+   *
+   * @param {Object} request The request object
+   */
+  _continueRequest(request) {
+    this._clearBeforeRequestTimeout(request.id);
+    delete request.promises;
+    delete request.reason;
+    delete request._beforePromisesResolved;
+    delete request._awaitingContinue;
+    delete request._beforeTimedOut;
+    delete request._currentTimeout;
+    delete request._cancelled;
+    // Changes to the `_requestCopy` object won't affect sent object.
+    // However changes made to FormData or File object of the payload property
+    // or to the `auth` object will affect send object because those are
+    // references to an object.
+    const copy = this._prepareTransportObject(request);
+    this.dispatchEvent(new CustomEvent('transport-request', {
+      composed: true,
+      bubbles: true,
+      detail: copy
+    }));
+  }
+  /**
+   * Creates an immutable request data object to be send to the transport
+   * library.
+   * @return {Object} Immutable request object.
+   */
+  _prepareTransportObject(request) {
+    const configuration = {};
+    Object.keys(request).forEach((key) => {
+      configuration[key] = {
+        value: request[key],
+        writable: false,
+        enumerable: true
+      };
+    });
+    return Object.create(Object.prototype, configuration);
+  }
+  /**
+   * Handler for `resend-auth-request` custom event to resend the request
+   * when needed.
+   * @param {CustomEvent} e
+   */
+  _resendHandler(e) {
+    const request = this._queue[e.detail.id];
+    if (!request) {
+      return;
+    }
+    this.processRequest(request);
+  }
+
+  _reportHandler(e) {
+    const request = this._queue[e.detail.id];
+    if (!request) {
+      return;
+    }
+    delete this._queue[e.detail.id];
+    this._reportResponse(request, e.detail);
+  }
+
+  _reportResponse(request, arcResponse) {
+    let p;
+    const ra = request.responseActions;
+    if (ra && ra.length) {
+      p = this._processResponseActions(ra, arcResponse.request, arcResponse.response);
+    } else {
+      p = Promise.resolve();
+    }
+    return p.catch(() => {}).then(() => {
+      this.dispatchEvent(new CustomEvent('api-response', {
+        bubbles: true,
+        composed: true,
+        detail: arcResponse
+      }));
+    });
+  }
+  /**
+   * Executes response action before displaying the results.
+   *
+   * @param {Array} actions list of actions to execute
+   * @param {Request} request
+   * @param {Response} response
+   */
+  _processResponseActions(actions, request, response) {
+    const e = new CustomEvent('run-response-actions', {
+      composed: true,
+      bubbles: true,
+      cancelable: true,
+      detail: {
+        actions,
+        request,
+        response
+      }
+    });
+    this.dispatchEvent(e);
+    if (e.defaultPrevented) {
+      return e.detail.result;
+    }
+    return Promise.resolve();
+  }
+
+  _reportCancelation(reason) {
+    reason = reason || 'The request has been canceled';
+    console.warn(reason);
+    this._reportError(new Error(reason));
+  }
+}
+window.customElements.define(ArcRequestLogic.is, ArcRequestLogic);
+</script>

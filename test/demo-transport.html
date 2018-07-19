@@ -1,0 +1,122 @@
+<!--
+@license
+Copyright 2018 The Advanced REST client authors <arc@mulesoft.com>
+Licensed under the Apache License, Version 2.0 (the "License"); you may not
+use this file except in compliance with the License. You may obtain a copy of
+the License at
+http://www.apache.org/licenses/LICENSE-2.0
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
+WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
+License for the specific language governing permissions and limitations under
+the License.
+-->
+<link rel="import" href="../../polymer/polymer-element.html">
+<script>
+class DemoTransport extends Polymer.Element {
+  static get is() { return 'demo-transport'; }
+
+  constructor() {
+    super();
+    this._onTransportRequested = this._onTransportRequested.bind(this);
+  }
+
+  connectedCallback() {
+    super.connectedCallback();
+    window.addEventListener('transport-request', this._onTransportRequested);
+  }
+
+  disconnectedCallback() {
+    super.disconnectedCallback();
+    window.removeEventListener('transport-request', this._onTransportRequested);
+  }
+  /* global Request */
+  _onTransportRequested(e) {
+    const request = e.detail;
+    const init = {
+      method: request.method,
+      body: request.payload,
+      headers: this._computeHeaders(request.headers),
+      credentials: 'include'
+    };
+    let requestObj;
+    try {
+      requestObj = new Request(request.url, init);
+    } catch (e) {
+      document.body.dispatchEvent(new CustomEvent('report-response', {
+        bubbles: true,
+        cancelable: true,
+        detail: {
+          request,
+          id: request.id,
+          isXhr: true,
+          loadingTime: 0,
+          isError: true,
+          error: e
+        }
+      }));
+      return;
+    }
+    const tStart = Date.now();
+    let tEnd;
+    const responseResult = {};
+    fetch(requestObj)
+    .then((response) => {
+      tEnd = Date.now() - tStart;
+      let headers = '';
+      response.headers.forEach((value, name) => {
+        headers += `${name}:`` ${value}\n`;
+      });
+      responseResult.headers = headers;
+      responseResult.status = response.status;
+      responseResult.statusText = response.statusText;
+      responseResult.url = response.url;
+      return response.text();
+    })
+    .then((body) => {
+      responseResult.payload = body;
+      document.body.dispatchEvent(new CustomEvent('report-response', {
+        bubbles: true,
+        cancelable: true,
+        detail: {
+          request,
+          response: responseResult,
+          id: request.id,
+          isXhr: true,
+          loadingTime: tEnd
+        }
+      }));
+    })
+    .catch((cause) => {
+      const tEnd = Date.now() - tStart;
+      document.body.dispatchEvent(new CustomEvent('report-response', {
+        bubbles: true,
+        cancelable: true,
+        detail: {
+          request,
+          id: request.id,
+          isXhr: true,
+          loadingTime: tEnd,
+          isError: true,
+          error: cause
+        }
+      }));
+    });
+  }
+
+  _computeHeaders(input) {
+    const headers = {};
+    if (input) {
+      input.split('\n').forEach(line => {
+        var parts = line.split(':');
+        if (parts[1]) {
+          parts[1] = parts[1].trim();
+        }
+        headers[parts[0]] = parts[1];
+      });
+    }
+    return headers;
+  }
+}
+window.customElements.define(DemoTransport.is, DemoTransport);
+</script>

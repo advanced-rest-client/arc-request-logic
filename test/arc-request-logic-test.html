@@ -1,0 +1,417 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, minimum-scale=1, initial-scale=1, user-scalable=yes">
+  <title>arc-request-logic test</title>
+  <script src="../../webcomponentsjs/webcomponents-loader.js"></script>
+  <script src="../../web-component-tester/browser.js"></script>
+  <link rel="import" href="../arc-request-logic.html">
+  <link rel="import" href="demo-transport.html">
+</head>
+<body>
+  <demo-transport></demo-transport>
+
+  <test-fixture id="Basic">
+    <template>
+      <arc-request-logic></arc-request-logic>
+    </template>
+  </test-fixture>
+
+  <script>
+  const request = {
+    id: 'test-id',
+    url: 'https://domain.com/${test1}',
+    headers: 'content-length: 0\nx-test: true\nx-var: ${test2}',
+    method: 'POST',
+    payload: '${test1}',
+    responseActions: [{
+      source: 'response.headers.status.${test4}',
+      action: 'assign-variable',
+      destination: 'myVar-${test3}'
+    }],
+    requestActions: {
+      variables: [{
+        enabled: true,
+        value: 'test-value',
+        variable: 'test-var'
+      }, {
+        enabled: true,
+        variable: 'v2',
+        value: '${test1}'
+      }]
+    }
+  };
+  suite('arc-request-logic', () => {
+    let element;
+    setup(() => {
+      element = fixture('Basic');
+    });
+
+    suite('_prepareEventRequest()', function() {
+      let result;
+      setup(function() {
+        const _request = Object.assign({}, request);
+        result = element._prepareEventRequest(_request);
+      });
+
+      test('Copies request object properties', function() {
+        assert.equal(result.url, request.url);
+        assert.equal(result.headers, request.headers);
+        assert.equal(result.method, request.method);
+      });
+
+      test('Generated object is a copy', function() {
+        result.url = 'test';
+        assert.notEqual(result.url, request.url);
+      });
+
+      test('Adds promises array', function() {
+        assert.typeOf(result.promises, 'array');
+      });
+
+      test('Removes payload for GET', function() {
+        const _request = Object.assign({}, request);
+        _request.payload = 'test';
+        _request.method = 'GET';
+        result = element._prepareEventRequest(_request);
+        assert.isUndefined(result.payload);
+      });
+
+      test('Removes payload for HEAD', function() {
+        const _request = Object.assign({}, request);
+        _request.payload = 'test';
+        _request.method = 'HEAD';
+        result = element._prepareEventRequest(_request);
+        assert.isUndefined(result.payload);
+      });
+
+      test('Do not removes payload for POST', function() {
+        const _request = Object.assign({}, request);
+        _request.payload = 'test';
+        _request.method = 'POST';
+        result = element._prepareEventRequest(_request);
+        assert.equal(result.payload, 'test');
+      });
+    });
+
+    suite('_computeHandlersTimeout()', function() {
+      test('Uses default timeout when no arguments', function() {
+        const result = element._computeHandlersTimeout();
+        assert.equal(result, element.handlersTimeout);
+      });
+
+      test('Returns highest time from the array of objects', function() {
+        const args = [{
+          'timeout': 2500
+        }, {
+          'timeout': 3500
+        }, {
+          'timeout': 2700
+        }];
+        const result = element._computeHandlersTimeout(args);
+        assert.equal(result, args[1].timeout);
+      });
+
+      test('Returns default time for lower timeouts in argument object', function() {
+        const args = [{
+          'timeout': 100
+        }, {
+          'timeout': 200
+        }, {
+          'timeout': 300
+        }];
+        const result = element._computeHandlersTimeout(args);
+        assert.equal(result, element.handlersTimeout);
+      });
+
+      test('Returns -1 when handlersTimeout is removed', function() {
+        element.handlersTimeout = 0;
+        const result = element._computeHandlersTimeout();
+        assert.equal(result, -1);
+      });
+
+      test('Returns -1 when any of timeouts in array is 0', function() {
+        assert.isAbove(element.handlersTimeout, 0);
+        const args = [{
+          'timeout': 100
+        }, {
+          'timeout': 0
+        }, {
+          'timeout': 300
+        }];
+        const result = element._computeHandlersTimeout(args);
+        assert.equal(result, -1);
+      });
+    });
+  });
+
+  suite('_clearBeforeRequestTimeout', function() {
+    let element;
+    setup(function() {
+      element = fixture('Basic');
+      const _r = Object.assign({}, request);
+      element._queue[request.id] = _r;
+    });
+
+    test('Clears the variable', function() {
+      element._queue[request.id]._currentTimeout = 'test';
+      element._clearBeforeRequestTimeout(request.id);
+      assert.isUndefined(element._queue[request.id]._currentTimeout);
+    });
+
+    test('Do nothing when variable is empty', function() {
+      element._clearBeforeRequestTimeout(request.id);
+      // Basically it doesn't throws an error.
+      assert.isUndefined(element._queue[request.id]._currentTimeout);
+    });
+
+    test('Clears existing timeout', function(done) {
+      let errored = false;
+      element._queue[request.id]._currentTimeout = window.setTimeout(function() {
+        errored = true;
+        done(new Error('Do not clears the timeout.'));
+      }, 10);
+      element._clearBeforeRequestTimeout(request.id);
+      window.setTimeout(function() {
+        done();
+      }, 15);
+    });
+  });
+
+  suite('_prepareTransportObject()', function() {
+    let element;
+    const orig = {
+      a: 'v1',
+      b: 'v2',
+      c: 'v3',
+      id: 1
+    };
+    let result;
+    setup(function() {
+      element = fixture('Basic');
+      result = element._prepareTransportObject(orig);
+    });
+    test('Creates copy of the object', function() {
+      assert.deepEqual(result, orig);
+    });
+    test('Values are immutable', function() {
+      result.a = 'a1';
+      result.b = 'a2';
+      result.c = 'a3';
+      assert.equal(result.a, orig.a);
+      assert.equal(result.b, orig.b);
+      assert.equal(result.c, orig.c);
+      assert.notEqual(result.a, 'a1');
+      assert.notEqual(result.b, 'a2');
+      assert.notEqual(result.c, 'a3');
+    });
+  });
+
+  suite('Pre request variables set', function() {
+    let result;
+    let element;
+    setup(function() {
+      element = fixture('Basic');
+    });
+    const contextFactory = function(e) {
+      e.preventDefault();
+      e.detail.value = [{
+        variable: 'test1',
+        value: 'value1',
+        enabled: true
+      }, {
+        variable: 'test2',
+        value: 'value2 ${test1}',
+        enabled: true
+      }, {
+        variable: 'test3',
+        value: 'value3 ${test4}',
+        enabled: true
+      }, {
+        variable: 'test4',
+        value: 'value4',
+        enabled: true
+      }, {
+        variable: 'test5',
+        value: 'value5',
+        enabled: false
+      }];
+    };
+
+    suiteSetup(function() {
+      window.addEventListener('variable-list', contextFactory);
+    });
+
+    suiteTeardown(function() {
+      window.removeEventListener('variable-list', contextFactory);
+    });
+
+    suite('_preparePreRequestVariables()', function() {
+      test('Returns Promise', function() {
+        result = element._preparePreRequestVariables(request);
+        assert.typeOf(result.then, 'function');
+      });
+      test('Evaluates variables', function() {
+        return element._preparePreRequestVariables(request)
+        .then(function(result) {
+          assert.equal(result.v2, 'value1');
+        });
+      });
+      test('Contains list of variables', function() {
+        return element._preparePreRequestVariables(request)
+        .then(function(result) {
+          assert.equal(result['test-var'], 'test-value');
+          assert.equal(result.v2, 'value1');
+        });
+      });
+      test('Contains two items', function() {
+        return element._preparePreRequestVariables(request)
+        .then(function(result) {
+          assert.lengthOf(Object.keys(result), 2);
+        });
+      });
+      test('Returns undefined when no actions', function() {
+        return element._preparePreRequestVariables({})
+        .then(function(result) {
+          assert.isUndefined(result);
+        });
+      });
+      test('Returns undefined when no variables in actions', function() {
+        return element._preparePreRequestVariables({
+          requestActions: {}
+        })
+        .then(function(result) {
+          assert.isUndefined(result);
+        });
+      });
+    });
+    suite('_notifyVariablesChange()', function() {
+      const vars = {
+        v1: 't1',
+        v2: '${test1}'
+      };
+      setup(function() {
+        element = fixture('Basic');
+      });
+      test('Fires event when variable to be set', function() {
+        const spy = sinon.spy();
+        element.addEventListener('variable-update-action', spy);
+        element._notifyVariablesChange(vars);
+        assert.equal(spy.callCount, 2);
+      });
+      test('Event detail contains valid properties', function() {
+        let eventData;
+        element.addEventListener('variable-update-action', function clb(e) {
+          element.removeEventListener('variable-update-action', clb);
+          eventData = e.detail;
+        });
+        element._notifyVariablesChange(vars);
+        assert.equal(eventData.variable, 'v1');
+        assert.equal(eventData.value, 't1');
+      });
+      test('Does not fire events for empty object', function() {
+        const spy = sinon.spy();
+        element.addEventListener('variable-update-action', spy);
+        element._notifyVariablesChange({});
+        assert.isFalse(spy.called);
+      });
+      test('Does not fire events for missing object', function() {
+        const spy = sinon.spy();
+        element.addEventListener('variable-update-action', spy);
+        element._notifyVariablesChange();
+        assert.isFalse(spy.called);
+      });
+    });
+    suite('_beforeProcessVariables()', function() {
+      let result;
+      setup(function(done) {
+        element = fixture('Basic');
+        element._beforeRequest = function(data) {
+          result = data;
+          done();
+        };
+        element._beforeProcessVariables(request);
+      });
+      test('Processes all variables', function() {
+        assert.equal(result.url, 'https://domain.com/value1');
+        assert.equal(result.headers, 'content-length: 0\nx-test: true\nx-var: value2 value1');
+        assert.equal(result.payload, 'value1');
+      });
+    });
+  });
+
+  suite('Before request event', () => {
+    let element;
+    setup(function() {
+      element = fixture('Basic');
+    });
+    const contextFactory = function(e) {
+      e.preventDefault();
+      e.detail.value = [{
+        variable: 'test1',
+        value: 'value1',
+        enabled: true
+      }, {
+        variable: 'test2',
+        value: 'value2 ${test1}',
+        enabled: true
+      }, {
+        variable: 'test3',
+        value: 'value3 ${test4}',
+        enabled: true
+      }, {
+        variable: 'test4',
+        value: 'value4',
+        enabled: true
+      }, {
+        variable: 'test5',
+        value: 'value5',
+        enabled: false
+      }];
+    };
+
+    suiteSetup(function() {
+      window.addEventListener('variable-list', contextFactory);
+    });
+
+    suiteTeardown(function() {
+      window.removeEventListener('variable-list', contextFactory);
+    });
+
+    test('Dispatches before-request custom event', (done) => {
+      element.addEventListener('before-request', () => {
+        done();
+      });
+      element.processRequest(request);
+    });
+
+    test('before-request has evaluated variables', (done) => {
+      element.addEventListener('before-request', (e) => {
+        assert.equal(e.detail.url, 'https://domain.com/value1', 'URL is set');
+        assert.equal(e.detail.headers,
+          'content-length: 0\nx-test: true\nx-var: value2 value1', 'Headers are set');
+        assert.equal(e.detail.payload, 'value1', 'Payload is set');
+        done();
+      });
+      element.processRequest(request);
+    });
+
+    test('before-request event is cancelable', (done) => {
+      element.addEventListener('before-request', (e) => {
+        assert.isTrue(e.cancelable);
+        done();
+      });
+      element.processRequest(request);
+    });
+
+    test('Dispatches transport-request event', (done) => {
+      element.addEventListener('transport-request', () => {
+        done();
+      });
+      element.processRequest(request);
+    });
+  });
+  </script>
+</body>
+</html>
