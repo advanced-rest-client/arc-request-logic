@@ -122,7 +122,7 @@ class ArcRequestLogic extends ArcBehaviors.EventsTargetBehavior(Polymer.Element)
   processRequest(request) {
     const copy = this._prepareEventRequest(request);
     this._queue[copy.id] = copy;
-    return this._beforeProcessVariables(request);
+    return this._beforeProcessVariables(copy);
   }
   /**
    * Prepares a request object to be used to send it with the `before-request`
