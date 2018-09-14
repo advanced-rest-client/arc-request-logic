@@ -58,6 +58,14 @@ declare namespace ApiElements {
     _apiRequestHandler(e: CustomEvent|null): void;
 
     /**
+     * Dispatches `url-history-store` custom event which is a part of request logic
+     * to store URL history.
+     *
+     * @param value Request URL
+     */
+    _reportUrlHistory(value: String|null): void;
+
+    /**
      * Processes the request by executing request actions and evaluating
      * variables. When ready it sends the request to the transport.
      *

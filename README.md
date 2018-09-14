@@ -6,17 +6,6 @@
 
 A request logic for Advanced REST Client excluding HTTP transport.
 
-<!---
-```
-<custom-element-demo>
-  <template>
-    <link rel="import" href="arc-request-logic.html">
-    <next-code-block></next-code-block>
-  </template>
-</custom-element-demo>
-```
--->
-
 ```html
 <arc-request-logic></arc-request-logic>
 ```
