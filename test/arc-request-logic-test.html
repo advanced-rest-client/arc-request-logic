@@ -6,6 +6,8 @@
   <title>arc-request-logic test</title>
   <script src="../../webcomponentsjs/webcomponents-loader.js"></script>
   <script src="../../web-component-tester/browser.js"></script>
+  <link rel="import" href="../../app-pouchdb/pouchdb.html">
+  <link rel="import" href="../../arc-models/variables-model.html">
   <link rel="import" href="../arc-request-logic.html">
   <link rel="import" href="demo-transport.html">
 </head>
@@ -216,7 +218,8 @@
     });
     const contextFactory = function(e) {
       e.preventDefault();
-      e.detail.value = [{
+      e.detail.environment = 'default';
+      e.detail.variables = [{
         variable: 'test1',
         value: 'value1',
         enabled: true
@@ -240,17 +243,18 @@
     };
 
     suiteSetup(function() {
-      window.addEventListener('variable-list', contextFactory);
+      window.addEventListener('environment-current', contextFactory);
     });
 
     suiteTeardown(function() {
-      window.removeEventListener('variable-list', contextFactory);
+      window.removeEventListener('environment-current', contextFactory);
     });
 
     suite('_preparePreRequestVariables()', function() {
       test('Returns Promise', function() {
         result = element._preparePreRequestVariables(request);
         assert.typeOf(result.then, 'function');
+        return result;
       });
       test('Evaluates variables', function() {
         return element._preparePreRequestVariables(request)
