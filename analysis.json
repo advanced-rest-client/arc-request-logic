@@ -8,16 +8,16 @@
       "properties": [
         {
           "name": "evalElement",
-          "type": "?",
-          "description": "",
+          "type": "Element",
+          "description": "Returns a reference to the `variables-evaluator` element.",
           "privacy": "public",
           "sourceRange": {
             "start": {
-              "line": 69,
+              "line": 72,
               "column": 2
             },
             "end": {
-              "line": 80,
+              "line": 83,
               "column": 3
             }
           },
@@ -78,11 +78,11 @@
           "privacy": "protected",
           "sourceRange": {
             "start": {
-              "line": 90,
+              "line": 93,
               "column": 2
             },
             "end": {
-              "line": 95,
+              "line": 98,
               "column": 3
             }
           },
@@ -102,11 +102,11 @@
           "privacy": "protected",
           "sourceRange": {
             "start": {
-              "line": 97,
+              "line": 100,
               "column": 2
             },
             "end": {
-              "line": 102,
+              "line": 105,
               "column": 3
             }
           },
@@ -126,11 +126,11 @@
           "privacy": "protected",
           "sourceRange": {
             "start": {
-              "line": 108,
+              "line": 111,
               "column": 2
             },
             "end": {
-              "line": 114,
+              "line": 117,
               "column": 3
             }
           },
@@ -151,11 +151,11 @@
           "privacy": "public",
           "sourceRange": {
             "start": {
-              "line": 121,
+              "line": 124,
               "column": 2
             },
             "end": {
-              "line": 125,
+              "line": 128,
               "column": 3
             }
           },
@@ -177,11 +177,11 @@
           "privacy": "protected",
           "sourceRange": {
             "start": {
-              "line": 139,
+              "line": 142,
               "column": 2
             },
             "end": {
-              "line": 146,
+              "line": 149,
               "column": 3
             }
           },
@@ -204,11 +204,11 @@
           "privacy": "protected",
           "sourceRange": {
             "start": {
-              "line": 156,
+              "line": 159,
               "column": 2
             },
             "end": {
-              "line": 164,
+              "line": 167,
               "column": 3
             }
           },
@@ -230,11 +230,11 @@
           "privacy": "protected",
           "sourceRange": {
             "start": {
-              "line": 174,
+              "line": 177,
               "column": 2
             },
             "end": {
-              "line": 192,
+              "line": 195,
               "column": 3
             }
           },
@@ -253,15 +253,15 @@
         },
         {
           "name": "_notifyVariablesChange",
-          "description": "Notifies",
+          "description": "Notifies listeners when variable update action changes",
           "privacy": "protected",
           "sourceRange": {
             "start": {
-              "line": 198,
+              "line": 200,
               "column": 2
             },
             "end": {
-              "line": 213,
+              "line": 215,
               "column": 3
             }
           },
@@ -269,13 +269,12 @@
           "params": [
             {
               "name": "obj",
-              "type": "[type]",
-              "description": "[description]"
+              "type": "Object",
+              "description": "Map of variables to update"
             }
           ],
           "return": {
-            "type": "[type]",
-            "desc": "[description]"
+            "type": "void"
           }
         },
         {
@@ -284,11 +283,11 @@
           "privacy": "protected",
           "sourceRange": {
             "start": {
-              "line": 218,
+              "line": 221,
               "column": 2
             },
             "end": {
-              "line": 257,
+              "line": 260,
               "column": 3
             }
           },
@@ -299,29 +298,36 @@
               "type": "Object",
               "description": "The request object."
             }
-          ]
+          ],
+          "return": {
+            "type": "Promise"
+          }
         },
         {
           "name": "_reportError",
-          "description": "",
+          "description": "Common function to report error in the process.",
           "privacy": "protected",
           "sourceRange": {
             "start": {
-              "line": 259,
+              "line": 266,
               "column": 2
             },
             "end": {
-              "line": 274,
+              "line": 281,
               "column": 3
             }
           },
           "metadata": {},
           "params": [
             {
-              "name": "id"
+              "name": "id",
+              "type": "String",
+              "description": "Request original ID."
             },
             {
-              "name": "cause"
+              "name": "cause",
+              "type": "Error",
+              "description": "An error object"
             }
           ],
           "return": {
@@ -334,11 +340,11 @@
           "privacy": "protected",
           "sourceRange": {
             "start": {
-              "line": 286,
+              "line": 293,
               "column": 2
             },
             "end": {
-              "line": 308,
+              "line": 315,
               "column": 3
             }
           },
@@ -361,11 +367,11 @@
           "privacy": "protected",
           "sourceRange": {
             "start": {
-              "line": 313,
+              "line": 320,
               "column": 2
             },
             "end": {
-              "line": 318,
+              "line": 325,
               "column": 3
             }
           },
@@ -387,11 +393,11 @@
           "privacy": "protected",
           "sourceRange": {
             "start": {
-              "line": 326,
+              "line": 333,
               "column": 2
             },
             "end": {
-              "line": 331,
+              "line": 338,
               "column": 3
             }
           },
@@ -409,15 +415,15 @@
         },
         {
           "name": "_continueRequestHandler",
-          "description": "Handler for `continue-request` custom event.",
+          "description": "Handler for `continue-request` custom event.\nCalls `continueRequest()` function.",
           "privacy": "protected",
           "sourceRange": {
             "start": {
-              "line": 337,
+              "line": 344,
               "column": 2
             },
             "end": {
-              "line": 343,
+              "line": 350,
               "column": 3
             }
           },
@@ -425,13 +431,11 @@
           "params": [
             {
               "name": "e",
-              "type": "[type]",
-              "description": "[description]"
+              "type": "CustomEvent"
             }
           ],
           "return": {
-            "type": "[type]",
-            "desc": "[description]"
+            "type": "void"
           }
         },
         {
@@ -440,11 +444,11 @@
           "privacy": "public",
           "sourceRange": {
             "start": {
-              "line": 352,
+              "line": 359,
               "column": 2
             },
             "end": {
-              "line": 361,
+              "line": 368,
               "column": 3
             }
           },
@@ -466,11 +470,11 @@
           "privacy": "protected",
           "sourceRange": {
             "start": {
-              "line": 369,
+              "line": 375,
               "column": 2
             },
             "end": {
-              "line": 388,
+              "line": 394,
               "column": 3
             }
           },
@@ -492,18 +496,20 @@
           "privacy": "protected",
           "sourceRange": {
             "start": {
-              "line": 394,
+              "line": 401,
               "column": 2
             },
             "end": {
-              "line": 404,
+              "line": 411,
               "column": 3
             }
           },
           "metadata": {},
           "params": [
             {
-              "name": "request"
+              "name": "request",
+              "type": "Object",
+              "description": "Request object."
             }
           ],
           "return": {
@@ -517,11 +523,11 @@
           "privacy": "protected",
           "sourceRange": {
             "start": {
-              "line": 410,
+              "line": 417,
               "column": 2
             },
             "end": {
-              "line": 416,
+              "line": 423,
               "column": 3
             }
           },
@@ -538,22 +544,23 @@
         },
         {
           "name": "_reportHandler",
-          "description": "",
+          "description": "Handler for `report-response` event dispatched by the transport library.\nReports the response using ARC events API and cleans data.",
           "privacy": "protected",
           "sourceRange": {
             "start": {
-              "line": 418,
+              "line": 429,
               "column": 2
             },
             "end": {
-              "line": 425,
+              "line": 436,
               "column": 3
             }
           },
           "metadata": {},
           "params": [
             {
-              "name": "e"
+              "name": "e",
+              "type": "CustomEvent"
             }
           ],
           "return": {
@@ -562,27 +569,34 @@
         },
         {
           "name": "_reportResponse",
-          "description": "",
+          "description": "Handles response actions if any and dispatches `api-response` event.",
           "privacy": "protected",
           "sourceRange": {
             "start": {
-              "line": 427,
+              "line": 443,
               "column": 2
             },
             "end": {
-              "line": 442,
+              "line": 458,
               "column": 3
             }
           },
           "metadata": {},
           "params": [
             {
-              "name": "request"
+              "name": "request",
+              "type": "Object",
+              "description": "ArcRequest object"
             },
             {
-              "name": "arcResponse"
+              "name": "arcResponse",
+              "type": "Object",
+              "description": "ArcResponse object"
             }
-          ]
+          ],
+          "return": {
+            "type": "Promise"
+          }
         },
         {
           "name": "_processResponseActions",
@@ -590,11 +604,11 @@
           "privacy": "protected",
           "sourceRange": {
             "start": {
-              "line": 450,
+              "line": 467,
               "column": 2
             },
             "end": {
-              "line": 466,
+              "line": 483,
               "column": 3
             }
           },
@@ -613,26 +627,31 @@
               "name": "response",
               "type": "Response"
             }
-          ]
+          ],
+          "return": {
+            "type": "Promise"
+          }
         },
         {
           "name": "_reportCancelation",
-          "description": "",
+          "description": "Reports cancelation by any of pre-request handlers.",
           "privacy": "protected",
           "sourceRange": {
             "start": {
-              "line": 468,
+              "line": 488,
               "column": 2
             },
             "end": {
-              "line": 472,
+              "line": 492,
               "column": 3
             }
           },
           "metadata": {},
           "params": [
             {
-              "name": "reason"
+              "name": "reason",
+              "type": "Error",
+              "description": "Error object for the reason."
             }
           ],
           "return": {
@@ -654,7 +673,7 @@
           "column": 0
         },
         "end": {
-          "line": 473,
+          "line": 493,
           "column": 1
         }
       },

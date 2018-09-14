@@ -34,7 +34,7 @@ the License.
  * @memberof ApiElements
  */
 class ArcRequestLogic extends ArcBehaviors.EventsTargetBehavior(Polymer.Element) {
-  static get is() { return 'arc-request-logic'; }
+  static get is() {return 'arc-request-logic';}
   static get properties() {
     return {
       /**
@@ -66,7 +66,10 @@ class ArcRequestLogic extends ArcBehaviors.EventsTargetBehavior(Polymer.Element)
     const template = document.createElement('template');
     return template;
   }
-
+  /**
+   * Returns a reference to the `variables-evaluator` element.
+   * @return {Element}
+   */
   get evalElement() {
     if (!this.$) {
       this.$ = {};
@@ -192,9 +195,8 @@ class ArcRequestLogic extends ArcBehaviors.EventsTargetBehavior(Polymer.Element)
     return _eval.evaluateVariables(result);
   }
   /**
-   * Notifies
-   * @param {[type]} obj [description]
-   * @return {[type]} [description]
+   * Notifies listeners when variable update action changes
+   * @param {Object} obj Map of variables to update
    */
   _notifyVariablesChange(obj) {
     if (!obj) {
@@ -215,6 +217,7 @@ class ArcRequestLogic extends ArcBehaviors.EventsTargetBehavior(Polymer.Element)
   /**
    * Handles the before request logic.
    * @param {Object} request The request object.
+   * @return {Promise}
    */
   _beforeRequest(request) {
     const ID = request.id;
@@ -256,7 +259,11 @@ class ArcRequestLogic extends ArcBehaviors.EventsTargetBehavior(Polymer.Element)
       console.warn(cause);
     });
   }
-
+  /**
+   * Common function to report error in the process.
+   * @param {String} id Request original ID.
+   * @param {Error} cause An error object
+   */
   _reportError(id, cause) {
     const request = this._queue[id];
     if (!request) {
@@ -332,8 +339,8 @@ class ArcRequestLogic extends ArcBehaviors.EventsTargetBehavior(Polymer.Element)
   }
   /**
    * Handler for `continue-request` custom event.
-   * @param {[type]} e [description]
-   * @return {[type]} [description]
+   * Calls `continueRequest()` function.
+   * @param {CustomEvent} e
    */
   _continueRequestHandler(e) {
     const request = this._queue[e.detail.id];
@@ -360,7 +367,6 @@ class ArcRequestLogic extends ArcBehaviors.EventsTargetBehavior(Polymer.Element)
     }
     this._continueRequest(request);
   }
-
   /**
    * Called when before request block finished (whatever the output) and the
    * request can now be send to the transport library.
@@ -390,6 +396,7 @@ class ArcRequestLogic extends ArcBehaviors.EventsTargetBehavior(Polymer.Element)
   /**
    * Creates an immutable request data object to be send to the transport
    * library.
+   * @param {Object} request Request object.
    * @return {Object} Immutable request object.
    */
   _prepareTransportObject(request) {
@@ -415,7 +422,11 @@ class ArcRequestLogic extends ArcBehaviors.EventsTargetBehavior(Polymer.Element)
     }
     this.processRequest(request);
   }
-
+  /**
+   * Handler for `report-response` event dispatched by the transport library.
+   * Reports the response using ARC events API and cleans data.
+   * @param {CustomEvent} e
+   */
   _reportHandler(e) {
     const request = this._queue[e.detail.id];
     if (!request) {
@@ -424,7 +435,12 @@ class ArcRequestLogic extends ArcBehaviors.EventsTargetBehavior(Polymer.Element)
     delete this._queue[e.detail.id];
     this._reportResponse(request, e.detail);
   }
-
+  /**
+   * Handles response actions if any and dispatches `api-response` event.
+   * @param {Object} request ArcRequest object
+   * @param {Object} arcResponse ArcResponse object
+   * @return {Promise}
+   */
   _reportResponse(request, arcResponse) {
     let p;
     const ra = request.responseActions;
@@ -447,6 +463,7 @@ class ArcRequestLogic extends ArcBehaviors.EventsTargetBehavior(Polymer.Element)
    * @param {Array} actions list of actions to execute
    * @param {Request} request
    * @param {Response} response
+   * @return {Promise}
    */
   _processResponseActions(actions, request, response) {
     const e = new CustomEvent('run-response-actions', {
@@ -465,7 +482,10 @@ class ArcRequestLogic extends ArcBehaviors.EventsTargetBehavior(Polymer.Element)
     }
     return Promise.resolve();
   }
-
+  /**
+   * Reports cancelation by any of pre-request handlers.
+   * @param {Error} reason Error object for the reason.
+   */
   _reportCancelation(reason) {
     reason = reason || 'The request has been canceled';
     console.warn(reason);
