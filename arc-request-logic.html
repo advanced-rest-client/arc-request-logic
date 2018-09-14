@@ -115,6 +115,24 @@ class ArcRequestLogic extends ArcBehaviors.EventsTargetBehavior(Polymer.Element)
     e.stopImmediatePropagation();
     const request = e.detail;
     this.processRequest(request);
+    window.requestAnimationFrame(() => {
+      this._reportUrlHistory(request.url);
+    });
+  }
+  /**
+   * Dispatches `url-history-store` custom event which is a part of request logic
+   * to store URL history.
+   * @param {String} value Request URL
+   */
+  _reportUrlHistory(value) {
+    this.dispatchEvent(new CustomEvent('url-history-store', {
+      bubbles: true,
+      composed: true,
+      cancelable: true,
+      detail: {
+        value
+      }
+    }));
   }
   /**
    * Processes the request by executing request actions and evaluating
@@ -491,6 +509,14 @@ class ArcRequestLogic extends ArcBehaviors.EventsTargetBehavior(Polymer.Element)
     console.warn(reason);
     this._reportError(new Error(reason));
   }
+
+  /**
+   * Dispatched when request is made. This is handled by `urlhistory-model`
+   * to store URL history data.
+   *
+   * @event url-history-store
+   * @param {String} value The URL to store.
+   */
 }
 window.customElements.define(ArcRequestLogic.is, ArcRequestLogic);
 </script>
