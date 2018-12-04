@@ -33,8 +33,11 @@ the License.
  * @demo demo/index.html
  * @memberof ApiElements
  */
-class ArcRequestLogic extends ArcBehaviors.EventsTargetBehavior(Polymer.Element) {
-  static get is() {return 'arc-request-logic';}
+class ArcRequestLogic extends
+  ArcBehaviors.EventsTargetBehavior(Polymer.Element) {
+  static get is() {
+    return 'arc-request-logic';
+  }
   static get properties() {
     return {
       /**
@@ -48,6 +51,11 @@ class ArcRequestLogic extends ArcBehaviors.EventsTargetBehavior(Polymer.Element)
         type: Number,
         value: 2000
       },
+      /**
+       * When set variables parsing is not performed.
+       * Actions are eqecuted even when this is set.
+       */
+      variablesDisabled: Boolean,
       /**
        * A map of currently handled requests.
        * Keys are requests IDs generated in the request editor.
@@ -166,7 +174,6 @@ class ArcRequestLogic extends ArcBehaviors.EventsTargetBehavior(Polymer.Element)
     }
     return shallowCopy;
   }
-
   /**
    * Before the request object can be sent to any `before-request` handler
    * it must be first evaluated by variables evaluator. It is the only way to
@@ -179,6 +186,9 @@ class ArcRequestLogic extends ArcBehaviors.EventsTargetBehavior(Polymer.Element)
     return this._preparePreRequestVariables(request)
     .then((override) => {
       this._notifyVariablesChange(override);
+      if (this.variablesDisabled) {
+        return Promise.resolve(request);
+      }
       return this.evalElement.processBeforeRequest(request, override);
     })
     .then((request) => this._beforeRequest(request))

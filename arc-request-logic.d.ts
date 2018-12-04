@@ -44,6 +44,12 @@ declare namespace ApiElements {
     handlersTimeout: number|null|undefined;
 
     /**
+     * When set variables parsing is not performed.
+     * Actions are eqecuted even when this is set.
+     */
+    variablesDisabled: boolean|null|undefined;
+
+    /**
      * A map of currently handled requests.
      * Keys are requests IDs generated in the request editor.
      */

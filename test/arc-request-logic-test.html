@@ -8,6 +8,7 @@
   <script src="../../web-component-tester/browser.js"></script>
   <link rel="import" href="../../app-pouchdb/pouchdb.html">
   <link rel="import" href="../../arc-models/variables-model.html">
+  <link rel="import" href="../../jexl/jexl.html">
   <link rel="import" href="../arc-request-logic.html">
   <link rel="import" href="demo-transport.html">
 </head>
@@ -17,6 +18,12 @@
   <test-fixture id="Basic">
     <template>
       <arc-request-logic></arc-request-logic>
+    </template>
+  </test-fixture>
+
+  <test-fixture id="VarsDisabled">
+    <template>
+      <arc-request-logic variables-disabled></arc-request-logic>
     </template>
   </test-fixture>
 
@@ -176,6 +183,7 @@
       }, 10);
       element._clearBeforeRequestTimeout(request.id);
       window.setTimeout(function() {
+        assert.isFalse(errored);
         done();
       }, 15);
     });
@@ -252,35 +260,44 @@
 
     suite('_preparePreRequestVariables()', function() {
       test('Returns Promise', function() {
-        result = element._preparePreRequestVariables(request);
+        const _request = Object.assign({}, request);
+        result = element._preparePreRequestVariables(_request);
         assert.typeOf(result.then, 'function');
         return result;
       });
+
       test('Evaluates variables', function() {
-        return element._preparePreRequestVariables(request)
+        const _request = Object.assign({}, request);
+        return element._preparePreRequestVariables(_request)
         .then(function(result) {
           assert.equal(result.v2, 'value1');
         });
       });
+
       test('Contains list of variables', function() {
-        return element._preparePreRequestVariables(request)
+        const _request = Object.assign({}, request);
+        return element._preparePreRequestVariables(_request)
         .then(function(result) {
           assert.equal(result['test-var'], 'test-value');
           assert.equal(result.v2, 'value1');
         });
       });
+
       test('Contains two items', function() {
-        return element._preparePreRequestVariables(request)
+        const _request = Object.assign({}, request);
+        return element._preparePreRequestVariables(_request)
         .then(function(result) {
           assert.lengthOf(Object.keys(result), 2);
         });
       });
+
       test('Returns undefined when no actions', function() {
         return element._preparePreRequestVariables({})
         .then(function(result) {
           assert.isUndefined(result);
         });
       });
+
       test('Returns undefined when no variables in actions', function() {
         return element._preparePreRequestVariables({
           requestActions: {}
@@ -290,20 +307,24 @@
         });
       });
     });
+
     suite('_notifyVariablesChange()', function() {
       const vars = {
         v1: 't1',
         v2: '${test1}'
       };
+
       setup(function() {
         element = fixture('Basic');
       });
+
       test('Fires event when variable to be set', function() {
         const spy = sinon.spy();
         element.addEventListener('variable-update-action', spy);
         element._notifyVariablesChange(vars);
         assert.equal(spy.callCount, 2);
       });
+
       test('Event detail contains valid properties', function() {
         let eventData;
         element.addEventListener('variable-update-action', function clb(e) {
@@ -314,12 +335,14 @@
         assert.equal(eventData.variable, 'v1');
         assert.equal(eventData.value, 't1');
       });
+
       test('Does not fire events for empty object', function() {
         const spy = sinon.spy();
         element.addEventListener('variable-update-action', spy);
         element._notifyVariablesChange({});
         assert.isFalse(spy.called);
       });
+
       test('Does not fire events for missing object', function() {
         const spy = sinon.spy();
         element.addEventListener('variable-update-action', spy);
@@ -327,6 +350,7 @@
         assert.isFalse(spy.called);
       });
     });
+
     suite('_beforeProcessVariables()', function() {
       let result;
       setup(function(done) {
@@ -335,12 +359,34 @@
           result = data;
           done();
         };
-        element._beforeProcessVariables(request);
+        const _request = Object.assign({}, request);
+        element._beforeProcessVariables(_request);
       });
+
       test('Processes all variables', function() {
         assert.equal(result.url, 'https://domain.com/value1');
         assert.equal(result.headers, 'content-length: 0\nx-test: true\nx-var: value2 value1');
         assert.equal(result.payload, 'value1');
+      });
+    });
+
+    suite('Variables disabled', function() {
+      let element;
+      let result;
+      setup((done) => {
+        element = fixture('VarsDisabled');
+        element._beforeRequest = function(data) {
+          result = data;
+          done();
+        };
+        const _request = Object.assign({}, request);
+        element._beforeProcessVariables(_request);
+      });
+
+      test('Does not evaluates variables', function() {
+        assert.equal(result.url, request.url);
+        assert.equal(result.headers, request.headers);
+        assert.equal(result.payload, request.payload);
       });
     });
   });
@@ -352,7 +398,7 @@
     });
     const contextFactory = function(e) {
       e.preventDefault();
-      e.detail.value = [{
+      e.detail.variables = [{
         variable: 'test1',
         value: 'value1',
         enabled: true
@@ -376,11 +422,11 @@
     };
 
     suiteSetup(function() {
-      window.addEventListener('variable-list', contextFactory);
+      window.addEventListener('environment-current', contextFactory);
     });
 
     suiteTeardown(function() {
-      window.removeEventListener('variable-list', contextFactory);
+      window.removeEventListener('environment-current', contextFactory);
     });
 
     test('Dispatches before-request custom event', (done) => {
