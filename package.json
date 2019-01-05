@@ -1,7 +1,7 @@
 {
   "name": "@advanced-rest-client/arc-request-logic",
   "description": "A request logic for Advanced REST Client excluding HTTP transport.",
-  "version": "2.0.0-preview",
+  "version": "2.0.0",
   "license": "Apache-2.0",
   "main": "arc-request-logic.html",
   "authors": [
