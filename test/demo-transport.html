@@ -14,7 +14,15 @@ the License.
 <link rel="import" href="../../polymer/polymer-element.html">
 <script>
 class DemoTransport extends Polymer.Element {
-  static get is() { return 'demo-transport'; }
+  static get is() {
+    return 'demo-transport';
+  }
+
+  static get properties() {
+    return {
+      enabled: Boolean
+    };
+  }
 
   constructor() {
     super();
@@ -32,6 +40,9 @@ class DemoTransport extends Polymer.Element {
   }
   /* global Request */
   _onTransportRequested(e) {
+    if (!this.enabled) {
+      return;
+    }
     const request = e.detail;
     const init = {
       method: request.method,
@@ -65,7 +76,7 @@ class DemoTransport extends Polymer.Element {
       tEnd = Date.now() - tStart;
       let headers = '';
       response.headers.forEach((value, name) => {
-        headers += `${name}:`` ${value}\n`;
+        headers += `${name}: ${value}\n`;
       });
       responseResult.headers = headers;
       responseResult.status = response.status;
