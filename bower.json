@@ -13,7 +13,7 @@
   ],
   "dependencies": {
     "polymer": "Polymer/polymer#^2.0.0",
-    "variables-evaluator": "advanced-rest-client/variables-evaluator#2.0.0-preview",
+    "variables-evaluator": "advanced-rest-client/variables-evaluator#^2.0.0",
     "events-target-behavior": "advanced-rest-client/events-target-behavior#^2.0.0"
   },
   "devDependencies": {
@@ -22,7 +22,7 @@
     "iron-test-helpers": "PolymerElements/iron-test-helpers#^2.0.0",
     "web-component-tester": "Polymer/web-component-tester#^6.0.0",
     "webcomponentsjs": "webcomponents/webcomponentsjs#^1.0.0",
-    "variables-manager": "advanced-rest-client/variables-manager#2.0.0-preview",
+    "variables-manager": "advanced-rest-client/variables-manager#^2.0.0",
     "arc-models": "advanced-rest-client/arc-models#2.0.0-preview",
     "app-pouchdb": "PolymerElements/app-pouchdb#^2.0.0",
     "jexl": "advanced-rest-client/Jexl#^2.0.0"

@@ -48,110 +48,871 @@
         enabled: true,
         variable: 'v2',
         value: '${test1}'
+      }, {
+        enabled: false,
+        variable: 'v3',
+        value: '${test2}'
       }]
     }
   };
-  suite('arc-request-logic', () => {
+
+  suite('get evalElement()', () => {
     let element;
     setup(() => {
       element = fixture('Basic');
     });
 
-    suite('_prepareEventRequest()', function() {
-      let result;
-      setup(function() {
-        const _request = Object.assign({}, request);
-        result = element._prepareEventRequest(_request);
-      });
+    test('Returns variables-evaluator element', () => {
+      const result = element.evalElement;
+      assert.equal(result.nodeName, 'VARIABLES-EVALUATOR');
+    });
 
-      test('Copies request object properties', function() {
-        assert.equal(result.url, request.url);
-        assert.equal(result.headers, request.headers);
-        assert.equal(result.method, request.method);
-      });
+    test('Inserts element into the DOM', () => {
+      const result = element.evalElement;
+      assert.ok(result);
+      const node = element.shadowRoot.querySelector('variables-evaluator');
+      assert.equal(node.nodeName, 'VARIABLES-EVALUATOR');
+    });
 
-      test('Generated object is a copy', function() {
-        result.url = 'test';
-        assert.notEqual(result.url, request.url);
-      });
+    test('Eval has noBeforeRequest property', () => {
+      const result = element.evalElement;
+      assert.isTrue(result.noBeforeRequest);
+    });
 
-      test('Adds promises array', function() {
-        assert.typeOf(result.promises, 'array');
-      });
+    test('Eval has eventTarget property', () => {
+      const result = element.evalElement;
+      assert.isTrue(result.eventTarget === element.eventsTarget);
+    });
 
-      test('Removes payload for GET', function() {
-        const _request = Object.assign({}, request);
-        _request.payload = 'test';
-        _request.method = 'GET';
-        result = element._prepareEventRequest(_request);
-        assert.isUndefined(result.payload);
-      });
+    test('Returns the same element', () => {
+      const result1 = element.evalElement;
+      const result2 = element.evalElement;
+      assert.isTrue(result1 === result2);
+    });
+  });
 
-      test('Removes payload for HEAD', function() {
-        const _request = Object.assign({}, request);
-        _request.payload = 'test';
-        _request.method = 'HEAD';
-        result = element._prepareEventRequest(_request);
-        assert.isUndefined(result.payload);
-      });
+  suite('_apiRequestHandler()', () => {
+    let element;
+    setup(() => {
+      element = fixture('Basic');
+    });
 
-      test('Do not removes payload for POST', function() {
-        const _request = Object.assign({}, request);
-        _request.payload = 'test';
-        _request.method = 'POST';
-        result = element._prepareEventRequest(_request);
-        assert.equal(result.payload, 'test');
+    function fire() {
+      const e = new CustomEvent('api-request', {
+        bubbles: true,
+        cancelable: true,
+        detail: {
+          id: 'test',
+          url: 'http://test',
+          method: 'GET',
+          headers: ''
+        }
+      });
+      document.body.dispatchEvent(e);
+      return e;
+    }
+
+    test('Handles api-request event', (done) => {
+      element.addEventListener('transport-request', function f() {
+        element.removeEventListener('transport-request', f);
+        done();
+      });
+      const e = fire();
+      assert.isTrue(e.defaultPrevented);
+    });
+
+    test('Calls processRequest()', (done) => {
+      const spy = sinon.spy(element, 'processRequest');
+      element.addEventListener('transport-request', function f() {
+        element.removeEventListener('transport-request', f);
+        done();
+      });
+      const e = fire();
+      assert.isTrue(spy.called);
+      assert.isTrue(spy.args[0][0] === e.detail);
+    });
+
+    test('Calls _reportUrlHistory()', (done) => {
+      const spy = sinon.spy(element, '_reportUrlHistory');
+      element.addEventListener('transport-request', function f() {
+        element.removeEventListener('transport-request', f);
+        Polymer.RenderStatus.afterNextRender(element, () => {
+          assert.isTrue(spy.called);
+          assert.equal(spy.args[0][0], 'http://test');
+          done();
+        });
+      });
+      fire();
+    });
+  });
+
+  suite('_reportUrlHistory()', () => {
+    const value = 'https://domain.com';
+    let element;
+    setup(() => {
+      element = fixture('Basic');
+    });
+
+    test('Dispatches url-history-store event', () => {
+      const spy = sinon.spy();
+      element.addEventListener('url-history-store', spy);
+      element._reportUrlHistory(value);
+      assert.isTrue(spy.called);
+    });
+
+    test('Returns the event', () => {
+      const result = element._reportUrlHistory(value);
+      assert.typeOf(result, 'customevent');
+    });
+
+    test('Event is cancelable', () => {
+      const result = element._reportUrlHistory(value);
+      assert.isTrue(result.cancelable);
+    });
+
+    test('Event is composed', () => {
+      const result = element._reportUrlHistory(value);
+      if (result.composed !== undefined) {
+        assert.isTrue(result.composed);
+      }
+    });
+
+    test('Event has value set', () => {
+      const result = element._reportUrlHistory(value);
+      assert.equal(result.detail.value, value);
+    });
+  });
+
+  suite('processRequest()', () => {
+    let element;
+    let request;
+    setup(() => {
+      element = fixture('Basic');
+      request = {
+        id: 'test',
+        url: 'http://test',
+        method: 'GET',
+        headers: ''
+      };
+    });
+
+    test('Calls _prepareEventRequest()', (done) => {
+      const spy = sinon.spy(element, '_prepareEventRequest');
+      element.processRequest(request);
+      element.addEventListener('transport-request', function f() {
+        element.removeEventListener('transport-request', f);
+        assert.isTrue(spy.called);
+        // For a moment this are different objects.
+        assert.deepEqual(spy.args[0][0], request);
+        done();
       });
     });
 
-    suite('_computeHandlersTimeout()', function() {
-      test('Uses default timeout when no arguments', function() {
-        const result = element._computeHandlersTimeout();
-        assert.equal(result, element.handlersTimeout);
+    test('Adds request to the queue', (done) => {
+      element.processRequest(request);
+      element.addEventListener('transport-request', function f() {
+        element.removeEventListener('transport-request', f);
+        assert.deepEqual(element._queue[request.id].id, request.id);
+        done();
       });
+    });
 
-      test('Returns highest time from the array of objects', function() {
-        const args = [{
-          'timeout': 2500
-        }, {
-          'timeout': 3500
-        }, {
-          'timeout': 2700
-        }];
-        const result = element._computeHandlersTimeout(args);
-        assert.equal(result, args[1].timeout);
+    test('Calls _beforeProcessVariables()', (done) => {
+      const spy = sinon.spy(element, '_beforeProcessVariables');
+      element.processRequest(request);
+      element.addEventListener('transport-request', function f() {
+        element.removeEventListener('transport-request', f);
+        assert.isTrue(spy.called);
+        assert.deepEqual(spy.args[0][0].id, request.id);
+        done();
       });
+    });
 
-      test('Returns default time for lower timeouts in argument object', function() {
-        const args = [{
-          'timeout': 100
-        }, {
-          'timeout': 200
-        }, {
-          'timeout': 300
-        }];
-        const result = element._computeHandlersTimeout(args);
-        assert.equal(result, element.handlersTimeout);
-      });
+    test('Returns a promise', () => {
+      const result = element.processRequest(request);
+      assert.typeOf(result.then, 'function');
+      return result;
+    });
+  });
 
-      test('Returns -1 when handlersTimeout is removed', function() {
-        element.handlersTimeout = 0;
-        const result = element._computeHandlersTimeout();
-        assert.equal(result, -1);
-      });
+  suite('_prepareEventRequest()', function() {
+    let result;
+    let element;
+    setup(function() {
+      element = fixture('Basic');
+      const _request = Object.assign({}, request);
+      result = element._prepareEventRequest(_request);
+    });
 
-      test('Returns -1 when any of timeouts in array is 0', function() {
-        assert.isAbove(element.handlersTimeout, 0);
-        const args = [{
-          'timeout': 100
-        }, {
-          'timeout': 0
-        }, {
-          'timeout': 300
-        }];
-        const result = element._computeHandlersTimeout(args);
-        assert.equal(result, -1);
+    test('Copies request object properties', function() {
+      assert.equal(result.url, request.url);
+      assert.equal(result.headers, request.headers);
+      assert.equal(result.method, request.method);
+    });
+
+    test('Generated object is a copy', function() {
+      result.url = 'test';
+      assert.notEqual(result.url, request.url);
+    });
+
+    test('Adds promises array', function() {
+      assert.typeOf(result.promises, 'array');
+    });
+
+    test('Removes payload for GET', function() {
+      const _request = Object.assign({}, request);
+      _request.payload = 'test';
+      _request.method = 'GET';
+      result = element._prepareEventRequest(_request);
+      assert.isUndefined(result.payload);
+    });
+
+    test('Removes payload for HEAD', function() {
+      const _request = Object.assign({}, request);
+      _request.payload = 'test';
+      _request.method = 'HEAD';
+      result = element._prepareEventRequest(_request);
+      assert.isUndefined(result.payload);
+    });
+
+    test('Do not removes payload for POST', function() {
+      const _request = Object.assign({}, request);
+      _request.payload = 'test';
+      _request.method = 'POST';
+      result = element._prepareEventRequest(_request);
+      assert.equal(result.payload, 'test');
+    });
+  });
+
+  suite('_beforeProcessVariables()', function() {
+    const contextFactory = function(e) {
+      e.preventDefault();
+      e.detail.variables = [{
+        variable: 'test1',
+        value: 'value1',
+        enabled: true
+      }, {
+        variable: 'test2',
+        value: 'value2 ${test1}',
+        enabled: true
+      }, {
+        variable: 'test3',
+        value: 'value3 ${test4}',
+        enabled: true
+      }, {
+        variable: 'test4',
+        value: 'value4',
+        enabled: true
+      }, {
+        variable: 'test5',
+        value: 'value5',
+        enabled: false
+      }];
+    };
+
+    suiteSetup(function() {
+      window.addEventListener('environment-current', contextFactory);
+    });
+
+    suiteTeardown(function() {
+      window.removeEventListener('environment-current', contextFactory);
+    });
+
+    let element;
+    setup(function() {
+      element = fixture('Basic');
+    });
+
+    test('Processes all variables', function(done) {
+      element.addEventListener('transport-request', function f(e) {
+        element.removeEventListener('transport-request', f);
+        const result = e.detail;
+        assert.equal(result.url, 'https://domain.com/value1');
+        assert.equal(result.headers, 'content-length: 0\nx-test: true\nx-var: value2 value1');
+        assert.equal(result.payload, 'value1');
+        done();
       });
+      const r = Object.assign({}, request);
+      element._queue[r.id] = r;
+      element._beforeProcessVariables(r);
+    });
+
+    test('Calls _beforeRequest() even when error', (done) => {
+      const r = Object.assign({}, request);
+      element._queue[r.id] = r;
+      element._preparePreRequestVariables = () => Promise.reject();
+      const spy = sinon.spy(element, '_beforeRequest');
+      element.addEventListener('transport-request', function f() {
+        element.removeEventListener('transport-request', f);
+        assert.isTrue(spy.called);
+        done();
+      });
+      element._beforeProcessVariables(r);
+    });
+
+    test('Calls _preparePreRequestVariables()', () => {
+      const r = Object.assign({}, request);
+      element._queue[r.id] = r;
+      const spy = sinon.spy(element, '_preparePreRequestVariables');
+      return element._beforeProcessVariables(r)
+      .then(() => {
+        assert.isTrue(spy.called);
+        assert.deepEqual(spy.args[0][0], r);
+      });
+    });
+
+    test('Calls _notifyVariablesChange()', () => {
+      const r = Object.assign({}, request);
+      element._queue[r.id] = r;
+      const spy = sinon.spy(element, '_notifyVariablesChange');
+      return element._beforeProcessVariables(r)
+      .then(() => {
+        assert.isTrue(spy.called);
+        assert.typeOf(spy.args[0][0], 'object');
+      });
+    });
+
+    test('Calls processBeforeRequest()', () => {
+      const r = Object.assign({}, request);
+      element._queue[r.id] = r;
+      const spy = sinon.spy(element.evalElement, 'processBeforeRequest');
+      return element._beforeProcessVariables(r)
+      .then(() => {
+        assert.isTrue(spy.called);
+        assert.deepEqual(spy.args[0][0], r);
+        assert.typeOf(spy.args[0][1], 'object');
+      });
+    });
+  });
+
+  suite('Variables disabled', function() {
+    let element;
+    let result;
+    setup((done) => {
+      element = fixture('VarsDisabled');
+      element._beforeRequest = function(data) {
+        result = data;
+        done();
+      };
+      const _request = Object.assign({}, request);
+      element._beforeProcessVariables(_request);
+    });
+
+    test('Does not evaluates variables', function() {
+      assert.equal(result.url, request.url);
+      assert.equal(result.headers, request.headers);
+      assert.equal(result.payload, request.payload);
+    });
+  });
+
+  suite('_preparePreRequestVariables()', function() {
+    const contextFactory = function(e) {
+      e.preventDefault();
+      e.detail.variables = [{
+        variable: 'test1',
+        value: 'value1',
+        enabled: true
+      }, {
+        variable: 'test2',
+        value: 'value2 ${test1}',
+        enabled: true
+      }, {
+        variable: 'test3',
+        value: 'value3 ${test4}',
+        enabled: true
+      }, {
+        variable: 'test4',
+        value: 'value4',
+        enabled: true
+      }, {
+        variable: 'v3',
+        value: 'value5',
+        enabled: false
+      }];
+    };
+
+    suiteSetup(function() {
+      window.addEventListener('environment-current', contextFactory);
+    });
+
+    suiteTeardown(function() {
+      window.removeEventListener('environment-current', contextFactory);
+    });
+
+    let element;
+    setup(function() {
+      element = fixture('Basic');
+    });
+
+    test('Returns Promise', function() {
+      const _request = Object.assign({}, request);
+      const result = element._preparePreRequestVariables(_request);
+      assert.typeOf(result.then, 'function');
+      return result;
+    });
+
+    test('Evaluates variables', function() {
+      const _request = Object.assign({}, request);
+      return element._preparePreRequestVariables(_request)
+      .then(function(result) {
+        assert.equal(result.v2, 'value1');
+      });
+    });
+
+    test('Contains list of variables', function() {
+      const _request = Object.assign({}, request);
+      return element._preparePreRequestVariables(_request)
+      .then(function(result) {
+        assert.equal(result['test-var'], 'test-value');
+        assert.equal(result.v2, 'value1');
+      });
+    });
+
+    test('Disabled variable is not present', function() {
+      const _request = Object.assign({}, request);
+      return element._preparePreRequestVariables(_request)
+      .then(function(result) {
+        assert.isUndefined(result.v3);
+      });
+    });
+
+    test('Contains two items', function() {
+      const _request = Object.assign({}, request);
+      return element._preparePreRequestVariables(_request)
+      .then(function(result) {
+        assert.lengthOf(Object.keys(result), 2);
+      });
+    });
+
+    test('Returns undefined when no actions', function() {
+      return element._preparePreRequestVariables({})
+      .then(function(result) {
+        assert.isUndefined(result);
+      });
+    });
+
+    test('Returns undefined when no variables in actions', function() {
+      return element._preparePreRequestVariables({
+        requestActions: {}
+      })
+      .then(function(result) {
+        assert.isUndefined(result);
+      });
+    });
+  });
+
+  suite('_notifyVariablesChange()', function() {
+    const vars = {
+      v1: 't1',
+      v2: '${test1}'
+    };
+    let element;
+    setup(function() {
+      element = fixture('Basic');
+    });
+
+    test('Fires event when variable to be set', function() {
+      const spy = sinon.spy();
+      element.addEventListener('variable-update-action', spy);
+      element._notifyVariablesChange(vars);
+      assert.equal(spy.callCount, 2);
+    });
+
+    test('Event detail contains valid properties', function() {
+      let eventData;
+      element.addEventListener('variable-update-action', function clb(e) {
+        element.removeEventListener('variable-update-action', clb);
+        eventData = e.detail;
+      });
+      element._notifyVariablesChange(vars);
+      assert.equal(eventData.variable, 'v1');
+      assert.equal(eventData.value, 't1');
+    });
+
+    test('Does not fire events for empty object', function() {
+      const spy = sinon.spy();
+      element.addEventListener('variable-update-action', spy);
+      element._notifyVariablesChange({});
+      assert.isFalse(spy.called);
+    });
+
+    test('Does not fire events for missing object', function() {
+      const spy = sinon.spy();
+      element.addEventListener('variable-update-action', spy);
+      element._notifyVariablesChange();
+      assert.isFalse(spy.called);
+    });
+  });
+
+  suite('_dispatchBeforeRequest()', () => {
+    let element;
+    const request = {url: 'test'};
+    setup(function() {
+      element = fixture('Basic');
+    });
+
+    test('Dispatches before-request event', () => {
+      const spy = sinon.spy();
+      element.addEventListener('before-request', spy);
+      element._dispatchBeforeRequest(request);
+      assert.isTrue(spy.called);
+    });
+
+    test('Returns the event', () => {
+      const result = element._dispatchBeforeRequest(request);
+      assert.typeOf(result, 'customevent');
+    });
+
+    test('Event is cancelable', () => {
+      const result = element._dispatchBeforeRequest(request);
+      assert.isTrue(result.cancelable);
+    });
+
+    test('Event is composed', () => {
+      const result = element._dispatchBeforeRequest(request);
+      if (result.composed !== undefined) {
+        assert.isTrue(result.composed);
+      }
+    });
+
+    test('Event has detail set', () => {
+      const result = element._dispatchBeforeRequest(request);
+      assert.deepEqual(result.detail, request);
+    });
+  });
+
+  suite('_beforeRequest()', () => {
+    let element;
+    const request = {url: 'http:domain.com', method: 'GET', id: 'test-id', promises: []};
+    let copy;
+    setup(() => {
+      element = fixture('Basic');
+      copy = Object.assign({}, request);
+      element._queue[copy.id] = copy;
+    });
+
+    teardown(() => {
+      if (element._queue[request.id] && element._queue[request.id]._currentTimeout) {
+        clearTimeout(element._queue[request.id]._currentTimeout);
+      }
+      request.promises = [];
+      element._queue = {};
+    });
+
+    test('Calls _dispatchBeforeRequest()', () => {
+      const spy = sinon.spy(element, '_dispatchBeforeRequest');
+      element._beforeRequest(copy);
+      assert.isTrue(spy.called);
+      assert.deepEqual(spy.args[0][0], copy);
+    });
+
+    test('Calls _reportCancelation() when event is cancelled', () => {
+      const spy = sinon.spy(element, '_reportCancelation');
+      element.addEventListener('before-request', function f(e) {
+        element.removeEventListener('before-request', f);
+        e.preventDefault();
+        e.detail.reason = 'test-reason';
+      });
+      element._beforeRequest(copy);
+      assert.isTrue(spy.called);
+      assert.deepEqual(spy.args[0][0], 'test-reason');
+    });
+
+    test('Returns a promise', () => {
+      element._continueRequest = () => {};
+      const result = element._beforeRequest(copy);
+      assert.typeOf(result.then, 'function');
+      return result;
+    });
+
+    test('Sets _beforePromisesResolved to false', () => {
+      element.addEventListener('before-request', function f(e) {
+        element.removeEventListener('before-request', f);
+        const p = Promise.resolve();
+        p.timeout = 10;
+        e.detail.promises.push(p);
+      });
+      const result = element._beforeRequest(copy);
+      assert.isFalse(element._queue[copy.id]._beforePromisesResolved);
+      return result;
+    });
+
+    test('Sets _currentTimeout', () => {
+      element.addEventListener('before-request', function f(e) {
+        element.removeEventListener('before-request', f);
+        const p = Promise.resolve();
+        p.timeout = 10;
+        e.detail.promises.push(p);
+      });
+      const result = element._beforeRequest(copy);
+      assert.typeOf(element._queue[copy.id]._currentTimeout, 'number');
+      return result;
+    });
+
+    test('Sets _awaitingContinue', () => {
+      element.addEventListener('before-request', function f(e) {
+        element.removeEventListener('before-request', f);
+        const p = Promise.resolve();
+        p.timeout = 0;
+        e.detail.promises.push(p);
+      });
+      const result = element._beforeRequest(copy);
+      assert.isTrue(element._queue[copy.id]._awaitingContinue);
+      return result;
+    });
+
+    test('Sets _beforePromisesResolved to true when ready', () => {
+      element.addEventListener('before-request', function f(e) {
+        element.removeEventListener('before-request', f);
+        const p = Promise.resolve();
+        p.timeout = 10;
+        e.detail.promises.push(p);
+      });
+      let arg;
+      element._continueRequest = (request) => arg = request;
+      return element._beforeRequest(copy)
+      .then(() => {
+        assert.isTrue(arg._beforePromisesResolved);
+      });
+    });
+
+    test('Calls _continueRequest()', () => {
+      element.addEventListener('before-request', function f(e) {
+        element.removeEventListener('before-request', f);
+        const p = Promise.resolve();
+        p.timeout = 10;
+        e.detail.promises.push(p);
+      });
+      const spy = sinon.spy(element, '_continueRequest');
+      return element._beforeRequest(copy)
+      .then(() => {
+        assert.isTrue(spy.called);
+      });
+    });
+
+    test('Won\'t call _continueRequest() when _cancelled flag is set', () => {
+      element.addEventListener('before-request', function f(e) {
+        element.removeEventListener('before-request', f);
+        const p = Promise.resolve();
+        p.timeout = 10;
+        e.detail.promises.push(p);
+      });
+      const spy = sinon.spy(element, '_continueRequest');
+      const result = element._beforeRequest(copy);
+      element._queue[request.id]._cancelled = true;
+      return result
+      .then(() => {
+        assert.isFalse(spy.called);
+      });
+    });
+
+    test('Won\'t call _continueRequest() when _beforeTimedOut flag is set', () => {
+      element.addEventListener('before-request', function f(e) {
+        element.removeEventListener('before-request', f);
+        const p = Promise.resolve();
+        p.timeout = 10;
+        e.detail.promises.push(p);
+      });
+      const spy = sinon.spy(element, '_continueRequest');
+      const result = element._beforeRequest(copy);
+      element._queue[request.id]._beforeTimedOut = true;
+      return result
+      .then(() => {
+        assert.isFalse(spy.called);
+      });
+    });
+
+    test('Won\'t call _continueRequest() when _awaitingContinue flag is set', () => {
+      element.addEventListener('before-request', function f(e) {
+        element.removeEventListener('before-request', f);
+        const p = Promise.resolve();
+        p.timeout = 10;
+        e.detail.promises.push(p);
+      });
+      const spy = sinon.spy(element, '_continueRequest');
+      const result = element._beforeRequest(copy);
+      element._queue[request.id]._awaitingContinue = true;
+      return result
+      .then(() => {
+        assert.isFalse(spy.called);
+      });
+    });
+
+    test('Calls _reportError() when promise error', () => {
+      element.addEventListener('before-request', function f(e) {
+        element.removeEventListener('before-request', f);
+        const p = Promise.reject(new Error('test-error'));
+        p.timeout = 10;
+        e.detail.promises.push(p);
+      });
+      const spy = sinon.spy(element, '_reportError');
+      return element._beforeRequest(copy)
+      .then(() => {
+        assert.isTrue(spy.called);
+        assert.equal(spy.args[0][0], request.id);
+        assert.typeOf(spy.args[0][1], 'error');
+      });
+    });
+
+    test('Calls _onBeforeRequestTimeout() when timeout', () => {
+      element.addEventListener('before-request', function f(e) {
+        element.removeEventListener('before-request', f);
+        const p = new Promise((resolve) => {
+          setTimeout(() => resolve(), 15);
+        });
+        p.timeout = 5;
+        e.detail.promises.push(p);
+      });
+      element.handlersTimeout = 1;
+      const spy = sinon.spy(element, '_onBeforeRequestTimeout');
+      return element._beforeRequest(copy)
+      .then(() => {
+        assert.isTrue(spy.called);
+        assert.equal(spy.args[0][0], request.id);
+      });
+    });
+  });
+
+  suite('_disaptchResponse()', () => {
+    let element;
+    const response = 'test-detail';
+    setup(() => {
+      element = fixture('Basic');
+    });
+
+    test('Dispatches url-history-store event', () => {
+      const spy = sinon.spy();
+      element.addEventListener('api-response', spy);
+      element._disaptchResponse(response);
+      assert.isTrue(spy.called);
+    });
+
+    test('Returns the event', () => {
+      const result = element._disaptchResponse(response);
+      assert.typeOf(result, 'customevent');
+    });
+
+    test('Event is not cancelable', () => {
+      const result = element._disaptchResponse(response);
+      assert.isFalse(result.cancelable);
+    });
+
+    test('Event is composed', () => {
+      const result = element._disaptchResponse(response);
+      if (result.composed !== undefined) {
+        assert.isTrue(result.composed);
+      }
+    });
+
+    test('Event has detail', () => {
+      const result = element._disaptchResponse(response);
+      assert.equal(result.detail, response);
+    });
+  });
+
+  suite('_reportError()', () => {
+    let element;
+    const request = {url: 'http:domain.com', method: 'GET', id: 'test-id'};
+    let error;
+    setup(() => {
+      element = fixture('Basic');
+      element._queue[request.id] = Object.assign({}, request);
+      error = new Error('test-error');
+    });
+
+    test('Does nothing when request is not found', () => {
+      element._reportError('some', error);
+      assert.typeOf(element._queue[request.id], 'object');
+    });
+
+    test('Removes request from the queue', () => {
+      element._reportError(request.id, error);
+      assert.isUndefined(element._queue[request.id]);
+    });
+
+    test('Calls _disaptchResponse()', () => {
+      const spy = sinon.spy(element, '_disaptchResponse');
+      element._reportError(request.id, error);
+      assert.isTrue(spy.called);
+    });
+
+    test('Event has isError set', () => {
+      const spy = sinon.spy(element, '_disaptchResponse');
+      element._reportError(request.id, error);
+      assert.isTrue(spy.args[0][0].isError);
+    });
+
+    test('Event has error set', () => {
+      const spy = sinon.spy(element, '_disaptchResponse');
+      element._reportError(request.id, error);
+      assert.isTrue(spy.args[0][0].error === error);
+    });
+
+    test('Event has loadingTime set', () => {
+      const spy = sinon.spy(element, '_disaptchResponse');
+      element._reportError(request.id, error);
+      assert.equal(spy.args[0][0].loadingTime, 0);
+    });
+
+    test('Event has request set', () => {
+      const spy = sinon.spy(element, '_disaptchResponse');
+      element._reportError(request.id, error);
+      assert.deepEqual(spy.args[0][0].request, request);
+    });
+  });
+
+  suite('_computeHandlersTimeout()', function() {
+    let element;
+    setup(() => {
+      element = fixture('Basic');
+    });
+
+    test('Uses default timeout when no arguments', function() {
+      const result = element._computeHandlersTimeout();
+      assert.equal(result, element.handlersTimeout);
+    });
+
+    test('Returns highest time from the array of objects', function() {
+      const args = [{
+        'timeout': 2500
+      }, {
+        'timeout': 3500
+      }, {
+        'timeout': 2700
+      }];
+      const result = element._computeHandlersTimeout(args);
+      assert.equal(result, args[1].timeout);
+    });
+
+    test('Returns default time for lower timeouts in argument object', function() {
+      const args = [{
+        'timeout': 100
+      }, {
+        'timeout': 200
+      }, {
+        'timeout': 300
+      }];
+      const result = element._computeHandlersTimeout(args);
+      assert.equal(result, element.handlersTimeout);
+    });
+
+    test('Returns -1 when handlersTimeout is removed', function() {
+      element.handlersTimeout = 0;
+      const result = element._computeHandlersTimeout();
+      assert.equal(result, -1);
+    });
+
+    test('Returns -1 when any of timeouts in array is 0', function() {
+      assert.isAbove(element.handlersTimeout, 0);
+      const args = [{
+        'timeout': 100
+      }, {
+        'timeout': 0
+      }, {
+        'timeout': 300
+      }];
+      const result = element._computeHandlersTimeout(args);
+      assert.equal(result, -1);
     });
   });
 
@@ -189,6 +950,284 @@
     });
   });
 
+  suite('_continueRequestHandler()', () => {
+    let element;
+    setup(function() {
+      element = fixture('Basic');
+      const _r = Object.assign({}, request);
+      element._queue[request.id] = _r;
+    });
+
+    test('Does nothing when request not defined', () => {
+      const spy = sinon.spy(element, 'continueRequest');
+      element._continueRequestHandler({
+        detail: {
+          id: 'other'
+        }
+      });
+      assert.isFalse(spy.called);
+    });
+
+    test('Calls continueRequest()', () => {
+      const spy = sinon.spy(element, 'continueRequest');
+      element._continueRequestHandler({
+        detail: {
+          id: request.id
+        }
+      });
+      assert.isTrue(spy.called);
+      assert.deepEqual(spy.args[0][0], request);
+    });
+  });
+
+  suite('continueRequest()', () => {
+    let element;
+    let request;
+    setup(function() {
+      element = fixture('Basic');
+      request = {
+        url: 'http:domain.com',
+        method: 'GET',
+        id: 'test-id',
+        _beforePromisesResolved: true
+      };
+      element._queue[request.id] = request;
+    });
+
+    test('Does nothing when _awaitingContinue flag is set', () => {
+      request._awaitingContinue = false;
+      const spy = sinon.spy(element, '_continueRequest');
+      element.continueRequest(request);
+      assert.isFalse(spy.called);
+    });
+
+    test('Does nothing when _beforePromisesResolved flag is not set', () => {
+      request._awaitingContinue = true;
+      request._beforePromisesResolved = false;
+      const spy = sinon.spy(element, '_continueRequest');
+      element.continueRequest(request);
+      assert.isFalse(spy.called);
+    });
+
+    test('Re-sets _awaitingContinue flag', () => {
+      request._awaitingContinue = true;
+      request._beforePromisesResolved = false;
+      element.continueRequest(request);
+      assert.isFalse(element._awaitingContinue);
+    });
+
+    test('Calls _continueRequest()', () => {
+      request._awaitingContinue = true;
+      request._beforePromisesResolved = true;
+      const spy = sinon.spy(element, '_continueRequest');
+      element.continueRequest(request);
+      assert.isTrue(spy.called);
+    });
+  });
+
+  suite('_continueRequest()', () => {
+    let element;
+    let request;
+    setup(function() {
+      element = fixture('Basic');
+      request = {
+        url: 'http:domain.com',
+        method: 'GET',
+        id: 'test-id'
+      };
+      element._queue[request.id] = request;
+    });
+
+    test('Calls _clearBeforeRequestTimeout()', () => {
+      const spy = sinon.spy(element, '_clearBeforeRequestTimeout');
+      element._continueRequest(request);
+      assert.isTrue(spy.called);
+      assert.equal(spy.args[0][0], request.id);
+    });
+    [
+      'promises', 'reason', '_beforePromisesResolved', '_awaitingContinue',
+      '_beforeTimedOut', '_currentTimeout', '_cancelled'
+    ].forEach((prop) => {
+      test('Clears ' + prop + ' property', () => {
+        let data;
+        element.addEventListener('transport-request', function f(e) {
+          element.removeEventListener('transport-request', f);
+          data = e.detail;
+        });
+        request[prop] = 'test-value';
+        element._continueRequest(request);
+        assert.isUndefined(data[prop]);
+      });
+    });
+  });
+
+  suite('_resendHandler()', () => {
+    let element;
+    let request;
+    setup(function() {
+      element = fixture('Basic');
+      request = {
+        url: 'http:domain.com',
+        method: 'GET',
+        id: 'test-id'
+      };
+      element._queue[request.id] = request;
+    });
+
+    test('Does nothing when request not in the queue', () => {
+      const spy = sinon.spy(element, 'processRequest');
+      element._resendHandler({
+        detail: {
+          id: 'other'
+        }
+      });
+      assert.isFalse(spy.called);
+    });
+
+    test('Calls processRequest()', () => {
+      const spy = sinon.spy(element, 'processRequest');
+      element._resendHandler({
+        detail: {
+          id: request.id
+        }
+      });
+      assert.isTrue(spy.called);
+    });
+  });
+
+  suite('_reportHandler()', () => {
+    let element;
+    let request;
+    setup(function() {
+      element = fixture('Basic');
+      request = {
+        url: 'http:domain.com',
+        method: 'GET',
+        id: 'test-id'
+      };
+      element._queue[request.id] = request;
+    });
+
+    test('Does nothing when request not in the queue', () => {
+      const spy = sinon.spy(element, '_reportResponse');
+      element._reportHandler({
+        detail: {
+          id: 'other'
+        }
+      });
+      assert.isFalse(spy.called);
+    });
+
+    test('Removes element from the queue', () => {
+      element._reportHandler({
+        detail: {
+          id: request.id
+        }
+      }, {});
+      assert.isUndefined(element._queue[request.id]);
+    });
+
+    test('Calls _reportResponse()', () => {
+      const spy = sinon.spy(element, '_reportResponse');
+      element._reportHandler({
+        detail: {
+          id: request.id
+        }
+      }, {});
+      assert.isTrue(spy.called);
+    });
+  });
+
+  suite('_reportResponse()', () => {
+    let element;
+    let request;
+    let response;
+    setup(function() {
+      element = fixture('Basic');
+      request = {
+        url: 'http:domain.com',
+        method: 'GET',
+        id: 'test-id'
+      };
+      response = {
+        request: {
+          url: 'http:domain.com',
+          method: 'GET'
+        },
+        response: {
+          status: 200,
+          statusText: 'OK',
+          url: 'http:domain.com/',
+          header: 'content-type: none',
+          payload: '{}'
+        }
+      };
+      element._queue[request.id] = request;
+    });
+
+    test('Resolves promise when no response actions', () => {
+      const result = element._reportResponse(request, response);
+      assert.typeOf(result.then, 'function');
+    });
+
+    test('Calls _processResponseActions() when has actions', () => {
+      request.responseActions = [{}];
+      const spy = sinon.spy(element, '_processResponseActions');
+      return element._reportResponse(request, response)
+      .then(() => {
+        assert.isTrue(spy.called, 'Function is called');
+        assert.isTrue(spy.args[0][0] === request.responseActions, 'actions argument is set');
+        assert.deepEqual(spy.args[0][1], response.request, 'request argument is set');
+        assert.deepEqual(spy.args[0][2], response.response, 'response argument is set');
+      });
+    });
+  });
+
+  suite('_processResponseActions()', () => {
+    let element;
+    let request;
+    let response;
+    let actions;
+    setup(function() {
+      element = fixture('Basic');
+      request = {
+        url: 'http:domain.com',
+        method: 'GET'
+      };
+      response = {
+        status: 200,
+        statusText: 'OK',
+        url: 'http:domain.com/',
+        header: 'content-type: none',
+        payload: '{}'
+      };
+      actions = [{}];
+    });
+
+    test('Dispatches "run-response-actions" event', () => {
+      const spy = sinon.spy();
+      element.addEventListener('run-response-actions', spy);
+      element._processResponseActions(actions, request, response);
+      assert.isTrue(spy.called, 'Event is dispatched');
+      const {detail} = spy.args[0][0];
+      assert.deepEqual(detail.actions, actions, 'actions is set');
+      assert.deepEqual(detail.request, request, 'request is set');
+      assert.deepEqual(detail.response, response, 'response is set');
+    });
+
+    test('Returns result of the event', () => {
+      element.addEventListener('run-response-actions', function f(e) {
+        element.removeEventListener('run-response-actions', f);
+        e.preventDefault();
+        e.detail.result = Promise.resolve('test');
+      });
+      return element._processResponseActions(actions, request, response)
+      .then((result) => {
+        assert.equal(result, 'test');
+      });
+    });
+  });
+
   suite('_prepareTransportObject()', function() {
     let element;
     const orig = {
@@ -215,179 +1254,6 @@
       assert.notEqual(result.a, 'a1');
       assert.notEqual(result.b, 'a2');
       assert.notEqual(result.c, 'a3');
-    });
-  });
-
-  suite('Pre request variables set', function() {
-    let result;
-    let element;
-    setup(function() {
-      element = fixture('Basic');
-    });
-    const contextFactory = function(e) {
-      e.preventDefault();
-      e.detail.environment = 'default';
-      e.detail.variables = [{
-        variable: 'test1',
-        value: 'value1',
-        enabled: true
-      }, {
-        variable: 'test2',
-        value: 'value2 ${test1}',
-        enabled: true
-      }, {
-        variable: 'test3',
-        value: 'value3 ${test4}',
-        enabled: true
-      }, {
-        variable: 'test4',
-        value: 'value4',
-        enabled: true
-      }, {
-        variable: 'test5',
-        value: 'value5',
-        enabled: false
-      }];
-    };
-
-    suiteSetup(function() {
-      window.addEventListener('environment-current', contextFactory);
-    });
-
-    suiteTeardown(function() {
-      window.removeEventListener('environment-current', contextFactory);
-    });
-
-    suite('_preparePreRequestVariables()', function() {
-      test('Returns Promise', function() {
-        const _request = Object.assign({}, request);
-        result = element._preparePreRequestVariables(_request);
-        assert.typeOf(result.then, 'function');
-        return result;
-      });
-
-      test('Evaluates variables', function() {
-        const _request = Object.assign({}, request);
-        return element._preparePreRequestVariables(_request)
-        .then(function(result) {
-          assert.equal(result.v2, 'value1');
-        });
-      });
-
-      test('Contains list of variables', function() {
-        const _request = Object.assign({}, request);
-        return element._preparePreRequestVariables(_request)
-        .then(function(result) {
-          assert.equal(result['test-var'], 'test-value');
-          assert.equal(result.v2, 'value1');
-        });
-      });
-
-      test('Contains two items', function() {
-        const _request = Object.assign({}, request);
-        return element._preparePreRequestVariables(_request)
-        .then(function(result) {
-          assert.lengthOf(Object.keys(result), 2);
-        });
-      });
-
-      test('Returns undefined when no actions', function() {
-        return element._preparePreRequestVariables({})
-        .then(function(result) {
-          assert.isUndefined(result);
-        });
-      });
-
-      test('Returns undefined when no variables in actions', function() {
-        return element._preparePreRequestVariables({
-          requestActions: {}
-        })
-        .then(function(result) {
-          assert.isUndefined(result);
-        });
-      });
-    });
-
-    suite('_notifyVariablesChange()', function() {
-      const vars = {
-        v1: 't1',
-        v2: '${test1}'
-      };
-
-      setup(function() {
-        element = fixture('Basic');
-      });
-
-      test('Fires event when variable to be set', function() {
-        const spy = sinon.spy();
-        element.addEventListener('variable-update-action', spy);
-        element._notifyVariablesChange(vars);
-        assert.equal(spy.callCount, 2);
-      });
-
-      test('Event detail contains valid properties', function() {
-        let eventData;
-        element.addEventListener('variable-update-action', function clb(e) {
-          element.removeEventListener('variable-update-action', clb);
-          eventData = e.detail;
-        });
-        element._notifyVariablesChange(vars);
-        assert.equal(eventData.variable, 'v1');
-        assert.equal(eventData.value, 't1');
-      });
-
-      test('Does not fire events for empty object', function() {
-        const spy = sinon.spy();
-        element.addEventListener('variable-update-action', spy);
-        element._notifyVariablesChange({});
-        assert.isFalse(spy.called);
-      });
-
-      test('Does not fire events for missing object', function() {
-        const spy = sinon.spy();
-        element.addEventListener('variable-update-action', spy);
-        element._notifyVariablesChange();
-        assert.isFalse(spy.called);
-      });
-    });
-
-    suite('_beforeProcessVariables()', function() {
-      let result;
-      setup(function(done) {
-        element = fixture('Basic');
-        element._beforeRequest = function(data) {
-          result = data;
-          done();
-        };
-        const _request = Object.assign({}, request);
-        element._beforeProcessVariables(_request);
-      });
-
-      test('Processes all variables', function() {
-        assert.equal(result.url, 'https://domain.com/value1');
-        assert.equal(result.headers, 'content-length: 0\nx-test: true\nx-var: value2 value1');
-        assert.equal(result.payload, 'value1');
-      });
-    });
-
-    suite('Variables disabled', function() {
-      let element;
-      let result;
-      setup((done) => {
-        element = fixture('VarsDisabled');
-        element._beforeRequest = function(data) {
-          result = data;
-          done();
-        };
-        const _request = Object.assign({}, request);
-        element._beforeProcessVariables(_request);
-      });
-
-      test('Does not evaluates variables', function() {
-        assert.equal(result.url, request.url);
-        assert.equal(result.headers, request.headers);
-        assert.equal(result.payload, request.payload);
-      });
     });
   });
 
@@ -460,6 +1326,87 @@
         done();
       });
       element.processRequest(request);
+    });
+  });
+
+  suite('Full request flow', () => {
+    suite('Without middleware', () => {
+      suiteSetup(() => {
+        document.querySelector('demo-transport').enabled = true;
+      });
+
+      suiteTeardown(() => {
+        document.querySelector('demo-transport').enabled = false;
+      });
+
+      let element;
+      let requests;
+      setup(function() {
+        element = fixture('Basic');
+        requests = [{
+          id: 'r1',
+          url: location.href,
+          method: 'GET',
+          headers: 'x-test: true'
+        }, {
+          id: 'r2',
+          url: 'http://domain',
+          method: 'POST',
+          headers: 'x-test: true',
+          payload: 'test'
+        }];
+      });
+
+      test('Runs the flow from the event', (done) => {
+        element.addEventListener('api-response', function f(e) {
+          element.removeEventListener('api-response', f);
+          assert.isFalse(e.cancelable, 'Event is not cancelable');
+          const detail = e.detail;
+          assert.equal(detail.id, 'r1');
+          assert.typeOf(detail.request, 'object');
+          assert.typeOf(detail.response, 'object');
+          assert.typeOf(detail.loadingTime, 'number');
+          assert.typeOf(detail.isXhr, 'boolean');
+          done();
+        });
+
+        document.body.dispatchEvent(new CustomEvent('api-request', {
+          bubbles: true,
+          cancelable: true,
+          detail: requests[0]
+        }));
+      });
+
+      test('Runs the flow from function call', (done) => {
+        element.addEventListener('api-response', function f(e) {
+          element.removeEventListener('api-response', f);
+          assert.isFalse(e.cancelable, 'Event is not cancelable');
+          const detail = e.detail;
+          assert.equal(detail.id, 'r1');
+          assert.typeOf(detail.request, 'object');
+          assert.typeOf(detail.response, 'object');
+          assert.typeOf(detail.loadingTime, 'number');
+          assert.typeOf(detail.isXhr, 'boolean');
+          done();
+        });
+        element.processRequest(requests[0]);
+      });
+
+      test('Runs the flow when response error', (done) => {
+        element.addEventListener('api-response', function f(e) {
+          element.removeEventListener('api-response', f);
+          assert.isFalse(e.cancelable, 'Event is not cancelable');
+          const detail = e.detail;
+          assert.equal(detail.id, 'r2');
+          assert.equal(detail.isError, true);
+          assert.typeOf(detail.request, 'object');
+          assert.isUndefined(detail.response);
+          assert.typeOf(detail.loadingTime, 'number');
+          assert.typeOf(detail.isXhr, 'boolean');
+          done();
+        });
+        element.processRequest(requests[1]);
+      });
     });
   });
   </script>

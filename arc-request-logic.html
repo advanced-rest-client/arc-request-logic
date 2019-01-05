@@ -12,6 +12,7 @@ License for the specific language governing permissions and limitations under
 the License.
 -->
 <link rel="import" href="../polymer/polymer-element.html">
+<link rel="import" href="../polymer/lib/utils/render-status.html">
 <link rel="import" href="../events-target-behavior/events-target-behavior.html">
 <link rel="import" href="../variables-evaluator/variables-evaluator.html">
 <script>
@@ -79,9 +80,6 @@ class ArcRequestLogic extends
    * @return {Element}
    */
   get evalElement() {
-    if (!this.$) {
-      this.$ = {};
-    }
     if (!this.$.eval) {
       this.$.eval = document.createElement('variables-evaluator');
       this.$.eval.noBeforeRequest = true;
@@ -123,7 +121,7 @@ class ArcRequestLogic extends
     e.stopImmediatePropagation();
     const request = e.detail;
     this.processRequest(request);
-    window.requestAnimationFrame(() => {
+    Polymer.RenderStatus.afterNextRender(this, () => {
       this._reportUrlHistory(request.url);
     });
   }
@@ -131,16 +129,19 @@ class ArcRequestLogic extends
    * Dispatches `url-history-store` custom event which is a part of request logic
    * to store URL history.
    * @param {String} value Request URL
+   * @return {CustomEvent} Disaptched event
    */
   _reportUrlHistory(value) {
-    this.dispatchEvent(new CustomEvent('url-history-store', {
+    const e = new CustomEvent('url-history-store', {
       bubbles: true,
       composed: true,
       cancelable: true,
       detail: {
         value
       }
-    }));
+    });
+    this.dispatchEvent(e);
+    return e;
   }
   /**
    * Processes the request by executing request actions and evaluating
@@ -243,21 +244,32 @@ class ArcRequestLogic extends
     });
   }
   /**
-   * Handles the before request logic.
-   * @param {Object} request The request object.
-   * @return {Promise}
+   * Dispatches `before-request` custom event.
+   * @param {Object} request ARC request object after variables evaluation.
+   * @return {CustomEvent}
    */
-  _beforeRequest(request) {
-    const ID = request.id;
-    const bre = new CustomEvent('before-request', {
+  _dispatchBeforeRequest(request) {
+    const e = new CustomEvent('before-request', {
       composed: true,
       bubbles: true,
       cancelable: true,
       detail: request
     });
-    this.dispatchEvent(bre);
+    this.dispatchEvent(e);
+    return e;
+  }
+
+  /**
+   * Handles the before request logic.
+   * @param {Object} request ARC request object after variables evaluation.
+   * @return {Promise}
+   */
+  _beforeRequest(request) {
+    const ID = request.id;
+    const bre = this._dispatchBeforeRequest(request);
     if (bre.defaultPrevented) {
-      return this._reportCancelation(bre.detail.reason);
+      this._reportCancelation(bre.detail.reason);
+      return Promise.resolve();
     }
     let p = bre.detail.promises;
     if (p && p.length) {
@@ -273,7 +285,10 @@ class ArcRequestLogic extends
     } else {
       p = Promise.resolve();
     }
-    p.then(() => {
+    return p.then(() => {
+      if (!this._queue[ID]) {
+        return;
+      }
       this._queue[ID]._beforePromisesResolved = true;
       if (this._queue[ID]._beforeTimedOut || this._queue[ID]._cancelled) {
         return;
@@ -288,6 +303,21 @@ class ArcRequestLogic extends
     });
   }
   /**
+   * Dispatches `api-response` event
+   * @param {Object} detail The detail object with ARC's `api-response` object.
+   * @return {CustomEvent}
+   */
+  _disaptchResponse(detail) {
+    const e = new CustomEvent('api-response', {
+      bubbles: true,
+      composed: true,
+      detail
+    });
+    this.dispatchEvent(e);
+    return e;
+  }
+
+  /**
    * Common function to report error in the process.
    * @param {String} id Request original ID.
    * @param {Error} cause An error object
@@ -297,16 +327,13 @@ class ArcRequestLogic extends
     if (!request) {
       return;
     }
-    this.dispatchEvent(new CustomEvent('api-response', {
-      bubbles: true,
-      composed: true,
-      detail: {
-        isError: true,
-        error: cause,
-        loadingTime: 0,
-        request
-      }
-    }));
+    delete this._queue[id];
+    this._disaptchResponse({
+      isError: true,
+      error: cause,
+      loadingTime: 0,
+      request
+    });
   }
   /**
    * Computes timeout for the before-request event handlers.
@@ -403,6 +430,7 @@ class ArcRequestLogic extends
    */
   _continueRequest(request) {
     this._clearBeforeRequestTimeout(request.id);
+    // request = Object.assign({}, request);
     delete request.promises;
     delete request.reason;
     delete request._beforePromisesResolved;
@@ -477,12 +505,10 @@ class ArcRequestLogic extends
     } else {
       p = Promise.resolve();
     }
-    return p.catch(() => {}).then(() => {
-      this.dispatchEvent(new CustomEvent('api-response', {
-        bubbles: true,
-        composed: true,
-        detail: arcResponse
-      }));
+    return p
+    .catch(() => {})
+    .then(() => {
+      this._disaptchResponse(arcResponse);
     });
   }
   /**
