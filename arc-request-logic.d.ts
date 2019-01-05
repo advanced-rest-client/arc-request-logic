@@ -9,6 +9,7 @@
  */
 
 /// <reference path="../polymer/types/polymer-element.d.ts" />
+/// <reference path="../polymer/types/lib/utils/render-status.d.ts" />
 /// <reference path="../events-target-behavior/events-target-behavior.d.ts" />
 /// <reference path="../variables-evaluator/variables-evaluator.d.ts" />
 
@@ -68,8 +69,9 @@ declare namespace ApiElements {
      * to store URL history.
      *
      * @param value Request URL
+     * @returns Disaptched event
      */
-    _reportUrlHistory(value: String|null): void;
+    _reportUrlHistory(value: String|null): CustomEvent|null;
 
     /**
      * Processes the request by executing request actions and evaluating
@@ -122,11 +124,25 @@ declare namespace ApiElements {
     _notifyVariablesChange(obj: object|null): void;
 
     /**
+     * Dispatches `before-request` custom event.
+     *
+     * @param request ARC request object after variables evaluation.
+     */
+    _dispatchBeforeRequest(request: object|null): CustomEvent|null;
+
+    /**
      * Handles the before request logic.
      *
-     * @param request The request object.
+     * @param request ARC request object after variables evaluation.
      */
     _beforeRequest(request: object|null): Promise<any>|null;
+
+    /**
+     * Dispatches `api-response` event
+     *
+     * @param detail The detail object with ARC's `api-response` object.
+     */
+    _disaptchResponse(detail: object|null): CustomEvent|null;
 
     /**
      * Common function to report error in the process.
