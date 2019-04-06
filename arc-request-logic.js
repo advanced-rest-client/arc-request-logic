@@ -1,4 +1,4 @@
-<!--
+/**
 @license
 Copyright 2018 The Advanced REST client authors <arc@mulesoft.com>
 Licensed under the Apache License, Version 2.0 (the "License"); you may not
@@ -10,12 +10,11 @@ distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
 WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
 License for the specific language governing permissions and limitations under
 the License.
--->
-<link rel="import" href="../polymer/polymer-element.html">
-<link rel="import" href="../polymer/lib/utils/render-status.html">
-<link rel="import" href="../events-target-behavior/events-target-behavior.html">
-<link rel="import" href="../variables-evaluator/variables-evaluator.html">
-<script>
+*/
+import {PolymerElement} from '../../@polymer/polymer/polymer-element.js';
+import {afterNextRender} from '../../@polymer/polymer/lib/utils/render-status.js';
+import {EventsTargetMixin} from '../../@advanced-rest-client/events-target-mixin/events-target-mixin.js';
+import '../../@advanced-rest-client/variables-evaluator/variables-evaluator.js';
 /**
  * `arc-request-logic`
  *
@@ -33,12 +32,9 @@ the License.
  * @polymer
  * @demo demo/index.html
  * @memberof ApiElements
+ * @appliesMixin EventsTargetMixin
  */
-class ArcRequestLogic extends
-  ArcBehaviors.EventsTargetBehavior(Polymer.Element) {
-  static get is() {
-    return 'arc-request-logic';
-  }
+class ArcRequestLogic extends EventsTargetMixin(PolymerElement) {
   static get properties() {
     return {
       /**
@@ -67,7 +63,20 @@ class ArcRequestLogic extends
         value() {
           return {};
         }
-      }
+      },
+      /**
+       * A reference name to the Jexl object.
+       * Use dot notation to access it from the `window` object.
+       * To set class pointer use `jexl` property.
+       */
+      jexlPath: String,
+      /**
+       * A Jexl class reference.
+       * If this value is set it must be a pointer to the Jexl class and
+       * `jexlPath` is ignored.
+       * This property is set automatically when `jexlPath` is processed.
+       */
+      jexl: Object
     };
   }
 
@@ -84,6 +93,8 @@ class ArcRequestLogic extends
       this.$.eval = document.createElement('variables-evaluator');
       this.$.eval.noBeforeRequest = true;
       this.$.eval.eventTarget = this.eventsTarget;
+      this.$.eval.jexlPath = this.jexlPath;
+      this.$.eval.jexl = this.jexl;
       this.shadowRoot.appendChild(this.$.eval);
     }
     return this.$.eval;
@@ -121,7 +132,7 @@ class ArcRequestLogic extends
     e.stopImmediatePropagation();
     const request = e.detail;
     this.processRequest(request);
-    Polymer.RenderStatus.afterNextRender(this, () => {
+    afterNextRender(this, () => {
       this._reportUrlHistory(request.url);
     });
   }
@@ -554,5 +565,4 @@ class ArcRequestLogic extends
    * @param {String} value The URL to store.
    */
 }
-window.customElements.define(ArcRequestLogic.is, ArcRequestLogic);
-</script>
+window.customElements.define('arc-request-logic', ArcRequestLogic);

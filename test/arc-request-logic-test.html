@@ -4,30 +4,36 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, minimum-scale=1, initial-scale=1, user-scalable=yes">
   <title>arc-request-logic test</title>
-  <script src="../../webcomponentsjs/webcomponents-loader.js"></script>
-  <script src="../../web-component-tester/browser.js"></script>
-  <link rel="import" href="../../app-pouchdb/pouchdb.html">
-  <link rel="import" href="../../arc-models/variables-model.html">
-  <link rel="import" href="../../jexl/jexl.html">
-  <link rel="import" href="../arc-request-logic.html">
-  <link rel="import" href="demo-transport.html">
+
+  <script src="../../../@webcomponents/webcomponentsjs/webcomponents-loader.js"></script>
+  <script src="../../../@polymer/test-fixture/test-fixture.js"></script>
+  <script src="../../../mocha/mocha.js"></script>
+  <script src="../../../chai/chai.js"></script>
+  <script src="../../../wct-mocha/wct-mocha.js"></script>
+
+  <script src="../dev-lib/jexl.min.js"></script>
 </head>
 <body>
   <demo-transport></demo-transport>
 
   <test-fixture id="Basic">
     <template>
-      <arc-request-logic></arc-request-logic>
+      <arc-request-logic jexl-path="ArcVariables.JexlDev"></arc-request-logic>
     </template>
   </test-fixture>
 
   <test-fixture id="VarsDisabled">
     <template>
-      <arc-request-logic variables-disabled></arc-request-logic>
+      <arc-request-logic variables-disabled jexl-path="ArcVariables.JexlDev"></arc-request-logic>
     </template>
   </test-fixture>
 
-  <script>
+  <script type="module">
+  import '../../../@advanced-rest-client/arc-models/variables-model.js';
+  import '../arc-request-logic.js';
+  import './demo-transport.js';
+  import {afterNextRender} from '../../../@polymer/polymer/lib/utils/render-status.js';
+  import sinon from '../../../sinon/pkg/sinon-esm.js';
   const request = {
     id: 'test-id',
     url: 'https://domain.com/${test1}',
@@ -136,7 +142,7 @@
       const spy = sinon.spy(element, '_reportUrlHistory');
       element.addEventListener('transport-request', function f() {
         element.removeEventListener('transport-request', f);
-        Polymer.RenderStatus.afterNextRender(element, () => {
+        afterNextRender(element, () => {
           assert.isTrue(spy.called);
           assert.equal(spy.args[0][0], 'http://test');
           done();
@@ -1236,18 +1242,23 @@
       c: 'v3',
       id: 1
     };
-    let result;
+
     setup(function() {
       element = fixture('Basic');
-      result = element._prepareTransportObject(orig);
     });
+
     test('Creates copy of the object', function() {
+      const result = element._prepareTransportObject(Object.assign({}, orig));
       assert.deepEqual(result, orig);
     });
+
     test('Values are immutable', function() {
-      result.a = 'a1';
-      result.b = 'a2';
-      result.c = 'a3';
+      const result = element._prepareTransportObject(Object.assign({}, orig));
+      try {
+        result.a = 'a1';
+        result.b = 'a2';
+        result.c = 'a3';
+      } catch (_) {}
       assert.equal(result.a, orig.a);
       assert.equal(result.b, orig.b);
       assert.equal(result.c, orig.c);
@@ -1389,7 +1400,7 @@
           assert.typeOf(detail.isXhr, 'boolean');
           done();
         });
-        element.processRequest(requests[0]);
+        element.processRequest(Object.assign({}, requests[0]));
       });
 
       test('Runs the flow when response error', (done) => {
