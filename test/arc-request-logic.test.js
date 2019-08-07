@@ -1,39 +1,27 @@
-<!doctype html>
-<html lang="en">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, minimum-scale=1, initial-scale=1, user-scalable=yes">
-  <title>arc-request-logic test</title>
+import { fixture, assert } from '@open-wc/testing';
+import sinon from 'sinon/pkg/sinon-esm.js';
+import '../arc-request-logic.js';
+import './demo-transport.js';
 
-  <script src="../../../@webcomponents/webcomponentsjs/webcomponents-loader.js"></script>
-  <script src="../../../@polymer/test-fixture/test-fixture.js"></script>
-  <script src="../../../mocha/mocha.js"></script>
-  <script src="../../../chai/chai.js"></script>
-  <script src="../../../wct-mocha/wct-mocha.js"></script>
+describe('<arc-request-logic>', function() {
+  async function basicFixture() {
+    return await fixture(`<arc-request-logic jexlpath="ArcVariables.JexlDev"></arc-request-logic>`);
+  }
 
-  <script src="../dev-lib/jexl.min.js"></script>
-</head>
-<body>
-  <demo-transport></demo-transport>
+  async function varsDisabledFixture() {
+    return await fixture(`<arc-request-logic variablesdisabled jexlpath="ArcVariables.JexlDev"></arc-request-logic>`);
+  }
 
-  <test-fixture id="Basic">
-    <template>
-      <arc-request-logic jexl-path="ArcVariables.JexlDev"></arc-request-logic>
-    </template>
-  </test-fixture>
+  before(() => {
+    const transport = document.createElement('demo-transport');
+    document.body.appendChild(transport);
+  });
 
-  <test-fixture id="VarsDisabled">
-    <template>
-      <arc-request-logic variables-disabled jexl-path="ArcVariables.JexlDev"></arc-request-logic>
-    </template>
-  </test-fixture>
+  after(() => {
+    const transport = document.querySelector('demo-transport');
+    document.body.removeChild(transport);
+  });
 
-  <script type="module">
-  import '../../../@advanced-rest-client/arc-models/variables-model.js';
-  import '../arc-request-logic.js';
-  import './demo-transport.js';
-  import {afterNextRender} from '../../../@polymer/polymer/lib/utils/render-status.js';
-  import sinon from '../../../sinon/pkg/sinon-esm.js';
   const request = {
     id: 'test-id',
     url: 'https://domain.com/${test1}',
@@ -62,45 +50,45 @@
     }
   };
 
-  suite('get evalElement()', () => {
+  describe('get evalElement()', () => {
     let element;
-    setup(() => {
-      element = fixture('Basic');
+    beforeEach(async () => {
+      element = await basicFixture();
     });
 
-    test('Returns variables-evaluator element', () => {
+    it('Returns variables-evaluator element', () => {
       const result = element.evalElement;
       assert.equal(result.nodeName, 'VARIABLES-EVALUATOR');
     });
 
-    test('Inserts element into the DOM', () => {
+    it('Inserts element into the DOM', () => {
       const result = element.evalElement;
       assert.ok(result);
       const node = element.shadowRoot.querySelector('variables-evaluator');
       assert.equal(node.nodeName, 'VARIABLES-EVALUATOR');
     });
 
-    test('Eval has noBeforeRequest property', () => {
+    it('Eval has noBeforeRequest property', () => {
       const result = element.evalElement;
       assert.isTrue(result.noBeforeRequest);
     });
 
-    test('Eval has eventTarget property', () => {
+    it('Eval has eventTarget property', () => {
       const result = element.evalElement;
       assert.isTrue(result.eventTarget === element.eventsTarget);
     });
 
-    test('Returns the same element', () => {
+    it('Returns the same element', () => {
       const result1 = element.evalElement;
       const result2 = element.evalElement;
       assert.isTrue(result1 === result2);
     });
   });
 
-  suite('_apiRequestHandler()', () => {
+  describe('_apiRequestHandler()', () => {
     let element;
-    setup(() => {
-      element = fixture('Basic');
+    beforeEach(async () => {
+      element = await basicFixture();
     });
 
     function fire() {
@@ -118,7 +106,7 @@
       return e;
     }
 
-    test('Handles api-request event', (done) => {
+    it('Handles api-request event', (done) => {
       element.addEventListener('transport-request', function f() {
         element.removeEventListener('transport-request', f);
         done();
@@ -127,7 +115,7 @@
       assert.isTrue(e.defaultPrevented);
     });
 
-    test('Calls processRequest()', (done) => {
+    it('Calls processRequest()', (done) => {
       const spy = sinon.spy(element, 'processRequest');
       element.addEventListener('transport-request', function f() {
         element.removeEventListener('transport-request', f);
@@ -138,11 +126,11 @@
       assert.isTrue(spy.args[0][0] === e.detail);
     });
 
-    test('Calls _reportUrlHistory()', (done) => {
+    it('Calls _reportUrlHistory()', (done) => {
       const spy = sinon.spy(element, '_reportUrlHistory');
       element.addEventListener('transport-request', function f() {
         element.removeEventListener('transport-request', f);
-        afterNextRender(element, () => {
+        setTimeout(() => {
           assert.isTrue(spy.called);
           assert.equal(spy.args[0][0], 'http://test');
           done();
@@ -152,48 +140,48 @@
     });
   });
 
-  suite('_reportUrlHistory()', () => {
+  describe('_reportUrlHistory()', () => {
     const value = 'https://domain.com';
     let element;
-    setup(() => {
-      element = fixture('Basic');
+    beforeEach(async () => {
+      element = await basicFixture();
     });
 
-    test('Dispatches url-history-store event', () => {
+    it('Dispatches url-history-store event', () => {
       const spy = sinon.spy();
       element.addEventListener('url-history-store', spy);
       element._reportUrlHistory(value);
       assert.isTrue(spy.called);
     });
 
-    test('Returns the event', () => {
+    it('Returns the event', () => {
       const result = element._reportUrlHistory(value);
       assert.typeOf(result, 'customevent');
     });
 
-    test('Event is cancelable', () => {
+    it('Event is cancelable', () => {
       const result = element._reportUrlHistory(value);
       assert.isTrue(result.cancelable);
     });
 
-    test('Event is composed', () => {
+    it('Event is composed', () => {
       const result = element._reportUrlHistory(value);
       if (result.composed !== undefined) {
         assert.isTrue(result.composed);
       }
     });
 
-    test('Event has value set', () => {
+    it('Event has value set', () => {
       const result = element._reportUrlHistory(value);
       assert.equal(result.detail.value, value);
     });
   });
 
-  suite('processRequest()', () => {
+  describe('processRequest()', () => {
     let element;
     let request;
-    setup(() => {
-      element = fixture('Basic');
+    beforeEach(async () => {
+      element = await basicFixture();
       request = {
         id: 'test',
         url: 'http://test',
@@ -202,7 +190,7 @@
       };
     });
 
-    test('Calls _prepareEventRequest()', (done) => {
+    it('Calls _prepareEventRequest()', (done) => {
       const spy = sinon.spy(element, '_prepareEventRequest');
       element.processRequest(request);
       element.addEventListener('transport-request', function f() {
@@ -214,7 +202,7 @@
       });
     });
 
-    test('Adds request to the queue', (done) => {
+    it('Adds request to the queue', (done) => {
       element.processRequest(request);
       element.addEventListener('transport-request', function f() {
         element.removeEventListener('transport-request', f);
@@ -223,7 +211,7 @@
       });
     });
 
-    test('Calls _beforeProcessVariables()', (done) => {
+    it('Calls _beforeProcessVariables()', (done) => {
       const spy = sinon.spy(element, '_beforeProcessVariables');
       element.processRequest(request);
       element.addEventListener('transport-request', function f() {
@@ -234,38 +222,38 @@
       });
     });
 
-    test('Returns a promise', () => {
+    it('Returns a promise', () => {
       const result = element.processRequest(request);
       assert.typeOf(result.then, 'function');
       return result;
     });
   });
 
-  suite('_prepareEventRequest()', function() {
+  describe('_prepareEventRequest()', function() {
     let result;
     let element;
-    setup(function() {
-      element = fixture('Basic');
+    beforeEach(async function() {
+      element = await basicFixture();
       const _request = Object.assign({}, request);
       result = element._prepareEventRequest(_request);
     });
 
-    test('Copies request object properties', function() {
+    it('Copies request object properties', function() {
       assert.equal(result.url, request.url);
       assert.equal(result.headers, request.headers);
       assert.equal(result.method, request.method);
     });
 
-    test('Generated object is a copy', function() {
+    it('Generated object is a copy', function() {
       result.url = 'test';
       assert.notEqual(result.url, request.url);
     });
 
-    test('Adds promises array', function() {
+    it('Adds promises array', function() {
       assert.typeOf(result.promises, 'array');
     });
 
-    test('Removes payload for GET', function() {
+    it('Removes payload for GET', function() {
       const _request = Object.assign({}, request);
       _request.payload = 'test';
       _request.method = 'GET';
@@ -273,7 +261,7 @@
       assert.isUndefined(result.payload);
     });
 
-    test('Removes payload for HEAD', function() {
+    it('Removes payload for HEAD', function() {
       const _request = Object.assign({}, request);
       _request.payload = 'test';
       _request.method = 'HEAD';
@@ -281,7 +269,7 @@
       assert.isUndefined(result.payload);
     });
 
-    test('Do not removes payload for POST', function() {
+    it('Do not removes payload for POST', function() {
       const _request = Object.assign({}, request);
       _request.payload = 'test';
       _request.method = 'POST';
@@ -290,7 +278,7 @@
     });
   });
 
-  suite('_beforeProcessVariables()', function() {
+  describe('_beforeProcessVariables()', function() {
     const contextFactory = function(e) {
       e.preventDefault();
       e.detail.variables = [{
@@ -316,20 +304,20 @@
       }];
     };
 
-    suiteSetup(function() {
+    before(function() {
       window.addEventListener('environment-current', contextFactory);
     });
 
-    suiteTeardown(function() {
+    after(function() {
       window.removeEventListener('environment-current', contextFactory);
     });
 
     let element;
-    setup(function() {
-      element = fixture('Basic');
+    beforeEach(async function() {
+      element = await basicFixture();
     });
 
-    test('Processes all variables', function(done) {
+    it('Processes all variables', function(done) {
       element.addEventListener('transport-request', function f(e) {
         element.removeEventListener('transport-request', f);
         const result = e.detail;
@@ -343,7 +331,7 @@
       element._beforeProcessVariables(r);
     });
 
-    test('Calls _beforeRequest() even when error', (done) => {
+    it('Calls _beforeRequest() when error', (done) => {
       const r = Object.assign({}, request);
       element._queue[r.id] = r;
       element._preparePreRequestVariables = () => Promise.reject();
@@ -356,7 +344,7 @@
       element._beforeProcessVariables(r);
     });
 
-    test('Calls _preparePreRequestVariables()', () => {
+    it('Calls _preparePreRequestVariables()', () => {
       const r = Object.assign({}, request);
       element._queue[r.id] = r;
       const spy = sinon.spy(element, '_preparePreRequestVariables');
@@ -367,7 +355,7 @@
       });
     });
 
-    test('Calls _notifyVariablesChange()', () => {
+    it('Calls _notifyVariablesChange()', () => {
       const r = Object.assign({}, request);
       element._queue[r.id] = r;
       const spy = sinon.spy(element, '_notifyVariablesChange');
@@ -378,7 +366,7 @@
       });
     });
 
-    test('Calls processBeforeRequest()', () => {
+    it('Calls processBeforeRequest()', () => {
       const r = Object.assign({}, request);
       element._queue[r.id] = r;
       const spy = sinon.spy(element.evalElement, 'processBeforeRequest');
@@ -391,27 +379,33 @@
     });
   });
 
-  suite('Variables disabled', function() {
+  describe('Variables disabled', function() {
     let element;
     let result;
-    setup((done) => {
-      element = fixture('VarsDisabled');
-      element._beforeRequest = function(data) {
-        result = data;
-        done();
-      };
+
+    async function untilBeforeRequest(element) {
+      return new Promise((resolve) => {
+        element._beforeRequest = function(data) {
+          resolve(data);
+        };
+      });
+    }
+
+    beforeEach(async () => {
+      element = await varsDisabledFixture();
       const _request = Object.assign({}, request);
       element._beforeProcessVariables(_request);
+      result = await untilBeforeRequest(element);
     });
 
-    test('Does not evaluates variables', function() {
+    it('Does not evaluates variables', function() {
       assert.equal(result.url, request.url);
       assert.equal(result.headers, request.headers);
       assert.equal(result.payload, request.payload);
     });
   });
 
-  suite('_preparePreRequestVariables()', function() {
+  describe('_preparePreRequestVariables()', function() {
     const contextFactory = function(e) {
       e.preventDefault();
       e.detail.variables = [{
@@ -437,27 +431,27 @@
       }];
     };
 
-    suiteSetup(function() {
+    before(function() {
       window.addEventListener('environment-current', contextFactory);
     });
 
-    suiteTeardown(function() {
+    after(function() {
       window.removeEventListener('environment-current', contextFactory);
     });
 
     let element;
-    setup(function() {
-      element = fixture('Basic');
+    beforeEach(async function() {
+      element = await basicFixture();
     });
 
-    test('Returns Promise', function() {
+    it('Returns Promise', function() {
       const _request = Object.assign({}, request);
       const result = element._preparePreRequestVariables(_request);
       assert.typeOf(result.then, 'function');
       return result;
     });
 
-    test('Evaluates variables', function() {
+    it('Evaluates variables', function() {
       const _request = Object.assign({}, request);
       return element._preparePreRequestVariables(_request)
       .then(function(result) {
@@ -465,7 +459,7 @@
       });
     });
 
-    test('Contains list of variables', function() {
+    it('Contains list of variables', function() {
       const _request = Object.assign({}, request);
       return element._preparePreRequestVariables(_request)
       .then(function(result) {
@@ -474,7 +468,7 @@
       });
     });
 
-    test('Disabled variable is not present', function() {
+    it('Disabled variable is not present', function() {
       const _request = Object.assign({}, request);
       return element._preparePreRequestVariables(_request)
       .then(function(result) {
@@ -482,7 +476,7 @@
       });
     });
 
-    test('Contains two items', function() {
+    it('Contains two items', function() {
       const _request = Object.assign({}, request);
       return element._preparePreRequestVariables(_request)
       .then(function(result) {
@@ -490,14 +484,14 @@
       });
     });
 
-    test('Returns undefined when no actions', function() {
+    it('Returns undefined when no actions', function() {
       return element._preparePreRequestVariables({})
       .then(function(result) {
         assert.isUndefined(result);
       });
     });
 
-    test('Returns undefined when no variables in actions', function() {
+    it('Returns undefined when no variables in actions', function() {
       return element._preparePreRequestVariables({
         requestActions: {}
       })
@@ -507,24 +501,24 @@
     });
   });
 
-  suite('_notifyVariablesChange()', function() {
+  describe('_notifyVariablesChange()', function() {
     const vars = {
       v1: 't1',
       v2: '${test1}'
     };
     let element;
-    setup(function() {
-      element = fixture('Basic');
+    beforeEach(async function() {
+      element = await basicFixture();
     });
 
-    test('Fires event when variable to be set', function() {
+    it('Fires event when variable to be set', function() {
       const spy = sinon.spy();
       element.addEventListener('variable-update-action', spy);
       element._notifyVariablesChange(vars);
       assert.equal(spy.callCount, 2);
     });
 
-    test('Event detail contains valid properties', function() {
+    it('Event detail contains valid properties', function() {
       let eventData;
       element.addEventListener('variable-update-action', function clb(e) {
         element.removeEventListener('variable-update-action', clb);
@@ -535,14 +529,14 @@
       assert.equal(eventData.value, 't1');
     });
 
-    test('Does not fire events for empty object', function() {
+    it('Does not fire events for empty object', function() {
       const spy = sinon.spy();
       element.addEventListener('variable-update-action', spy);
       element._notifyVariablesChange({});
       assert.isFalse(spy.called);
     });
 
-    test('Does not fire events for missing object', function() {
+    it('Does not fire events for missing object', function() {
       const spy = sinon.spy();
       element.addEventListener('variable-update-action', spy);
       element._notifyVariablesChange();
@@ -550,54 +544,54 @@
     });
   });
 
-  suite('_dispatchBeforeRequest()', () => {
+  describe('_dispatchBeforeRequest()', () => {
     let element;
     const request = {url: 'test'};
-    setup(function() {
-      element = fixture('Basic');
+    beforeEach(async function() {
+      element = await basicFixture();
     });
 
-    test('Dispatches before-request event', () => {
+    it('Dispatches before-request event', () => {
       const spy = sinon.spy();
       element.addEventListener('before-request', spy);
       element._dispatchBeforeRequest(request);
       assert.isTrue(spy.called);
     });
 
-    test('Returns the event', () => {
+    it('Returns the event', () => {
       const result = element._dispatchBeforeRequest(request);
       assert.typeOf(result, 'customevent');
     });
 
-    test('Event is cancelable', () => {
+    it('Event is cancelable', () => {
       const result = element._dispatchBeforeRequest(request);
       assert.isTrue(result.cancelable);
     });
 
-    test('Event is composed', () => {
+    it('Event is composed', () => {
       const result = element._dispatchBeforeRequest(request);
       if (result.composed !== undefined) {
         assert.isTrue(result.composed);
       }
     });
 
-    test('Event has detail set', () => {
+    it('Event has detail set', () => {
       const result = element._dispatchBeforeRequest(request);
       assert.deepEqual(result.detail, request);
     });
   });
 
-  suite('_beforeRequest()', () => {
+  describe('_beforeRequest()', () => {
     let element;
     const request = {url: 'http:domain.com', method: 'GET', id: 'test-id', promises: []};
     let copy;
-    setup(() => {
-      element = fixture('Basic');
+    beforeEach(async () => {
+      element = await basicFixture();
       copy = Object.assign({}, request);
       element._queue[copy.id] = copy;
     });
 
-    teardown(() => {
+    afterEach(() => {
       if (element._queue[request.id] && element._queue[request.id]._currentTimeout) {
         clearTimeout(element._queue[request.id]._currentTimeout);
       }
@@ -605,14 +599,14 @@
       element._queue = {};
     });
 
-    test('Calls _dispatchBeforeRequest()', () => {
+    it('Calls _dispatchBeforeRequest()', () => {
       const spy = sinon.spy(element, '_dispatchBeforeRequest');
       element._beforeRequest(copy);
       assert.isTrue(spy.called);
       assert.deepEqual(spy.args[0][0], copy);
     });
 
-    test('Calls _reportCancelation() when event is cancelled', () => {
+    it('Calls _reportCancelation() when event is cancelled', () => {
       const spy = sinon.spy(element, '_reportCancelation');
       element.addEventListener('before-request', function f(e) {
         element.removeEventListener('before-request', f);
@@ -624,14 +618,14 @@
       assert.deepEqual(spy.args[0][0], 'test-reason');
     });
 
-    test('Returns a promise', () => {
+    it('Returns a promise', () => {
       element._continueRequest = () => {};
       const result = element._beforeRequest(copy);
       assert.typeOf(result.then, 'function');
       return result;
     });
 
-    test('Sets _beforePromisesResolved to false', () => {
+    it('Sets _beforePromisesResolved to false', () => {
       element.addEventListener('before-request', function f(e) {
         element.removeEventListener('before-request', f);
         const p = Promise.resolve();
@@ -643,7 +637,7 @@
       return result;
     });
 
-    test('Sets _currentTimeout', () => {
+    it('Sets _currentTimeout', () => {
       element.addEventListener('before-request', function f(e) {
         element.removeEventListener('before-request', f);
         const p = Promise.resolve();
@@ -655,7 +649,7 @@
       return result;
     });
 
-    test('Sets _awaitingContinue', () => {
+    it('Sets _awaitingContinue', () => {
       element.addEventListener('before-request', function f(e) {
         element.removeEventListener('before-request', f);
         const p = Promise.resolve();
@@ -667,7 +661,7 @@
       return result;
     });
 
-    test('Sets _beforePromisesResolved to true when ready', () => {
+    it('Sets _beforePromisesResolved to true when ready', () => {
       element.addEventListener('before-request', function f(e) {
         element.removeEventListener('before-request', f);
         const p = Promise.resolve();
@@ -682,7 +676,7 @@
       });
     });
 
-    test('Calls _continueRequest()', () => {
+    it('Calls _continueRequest()', () => {
       element.addEventListener('before-request', function f(e) {
         element.removeEventListener('before-request', f);
         const p = Promise.resolve();
@@ -696,7 +690,7 @@
       });
     });
 
-    test('Won\'t call _continueRequest() when _cancelled flag is set', () => {
+    it('Won\'t call _continueRequest() when _cancelled flag is set', () => {
       element.addEventListener('before-request', function f(e) {
         element.removeEventListener('before-request', f);
         const p = Promise.resolve();
@@ -712,7 +706,7 @@
       });
     });
 
-    test('Won\'t call _continueRequest() when _beforeTimedOut flag is set', () => {
+    it('Won\'t call _continueRequest() when _beforeTimedOut flag is set', () => {
       element.addEventListener('before-request', function f(e) {
         element.removeEventListener('before-request', f);
         const p = Promise.resolve();
@@ -728,7 +722,7 @@
       });
     });
 
-    test('Won\'t call _continueRequest() when _awaitingContinue flag is set', () => {
+    it('Won\'t call _continueRequest() when _awaitingContinue flag is set', () => {
       element.addEventListener('before-request', function f(e) {
         element.removeEventListener('before-request', f);
         const p = Promise.resolve();
@@ -744,7 +738,7 @@
       });
     });
 
-    test('Calls _reportError() when promise error', () => {
+    it('Calls _reportError() when promise error', () => {
       element.addEventListener('before-request', function f(e) {
         element.removeEventListener('before-request', f);
         const p = Promise.reject(new Error('test-error'));
@@ -760,7 +754,7 @@
       });
     });
 
-    test('Calls _onBeforeRequestTimeout() when timeout', () => {
+    it('Calls _onBeforeRequestTimeout() when timeout', () => {
       element.addEventListener('before-request', function f(e) {
         element.removeEventListener('before-request', f);
         const p = new Promise((resolve) => {
@@ -779,106 +773,106 @@
     });
   });
 
-  suite('_disaptchResponse()', () => {
+  describe('_disaptchResponse()', () => {
     let element;
     const response = 'test-detail';
-    setup(() => {
-      element = fixture('Basic');
+    beforeEach(async () => {
+      element = await basicFixture();
     });
 
-    test('Dispatches url-history-store event', () => {
+    it('Dispatches url-history-store event', () => {
       const spy = sinon.spy();
       element.addEventListener('api-response', spy);
       element._disaptchResponse(response);
       assert.isTrue(spy.called);
     });
 
-    test('Returns the event', () => {
+    it('Returns the event', () => {
       const result = element._disaptchResponse(response);
       assert.typeOf(result, 'customevent');
     });
 
-    test('Event is not cancelable', () => {
+    it('Event is not cancelable', () => {
       const result = element._disaptchResponse(response);
       assert.isFalse(result.cancelable);
     });
 
-    test('Event is composed', () => {
+    it('Event is composed', () => {
       const result = element._disaptchResponse(response);
       if (result.composed !== undefined) {
         assert.isTrue(result.composed);
       }
     });
 
-    test('Event has detail', () => {
+    it('Event has detail', () => {
       const result = element._disaptchResponse(response);
       assert.equal(result.detail, response);
     });
   });
 
-  suite('_reportError()', () => {
+  describe('_reportError()', () => {
     let element;
     const request = {url: 'http:domain.com', method: 'GET', id: 'test-id'};
     let error;
-    setup(() => {
-      element = fixture('Basic');
+    beforeEach(async () => {
+      element = await basicFixture();
       element._queue[request.id] = Object.assign({}, request);
       error = new Error('test-error');
     });
 
-    test('Does nothing when request is not found', () => {
+    it('Does nothing when request is not found', () => {
       element._reportError('some', error);
       assert.typeOf(element._queue[request.id], 'object');
     });
 
-    test('Removes request from the queue', () => {
+    it('Removes request from the queue', () => {
       element._reportError(request.id, error);
       assert.isUndefined(element._queue[request.id]);
     });
 
-    test('Calls _disaptchResponse()', () => {
+    it('Calls _disaptchResponse()', () => {
       const spy = sinon.spy(element, '_disaptchResponse');
       element._reportError(request.id, error);
       assert.isTrue(spy.called);
     });
 
-    test('Event has isError set', () => {
+    it('Event has isError set', () => {
       const spy = sinon.spy(element, '_disaptchResponse');
       element._reportError(request.id, error);
       assert.isTrue(spy.args[0][0].isError);
     });
 
-    test('Event has error set', () => {
+    it('Event has error set', () => {
       const spy = sinon.spy(element, '_disaptchResponse');
       element._reportError(request.id, error);
       assert.isTrue(spy.args[0][0].error === error);
     });
 
-    test('Event has loadingTime set', () => {
+    it('Event has loadingTime set', () => {
       const spy = sinon.spy(element, '_disaptchResponse');
       element._reportError(request.id, error);
       assert.equal(spy.args[0][0].loadingTime, 0);
     });
 
-    test('Event has request set', () => {
+    it('Event has request set', () => {
       const spy = sinon.spy(element, '_disaptchResponse');
       element._reportError(request.id, error);
       assert.deepEqual(spy.args[0][0].request, request);
     });
   });
 
-  suite('_computeHandlersTimeout()', function() {
+  describe('_computeHandlersTimeout()', function() {
     let element;
-    setup(() => {
-      element = fixture('Basic');
+    beforeEach(async () => {
+      element = await basicFixture();
     });
 
-    test('Uses default timeout when no arguments', function() {
+    it('Uses default timeout when no arguments', function() {
       const result = element._computeHandlersTimeout();
       assert.equal(result, element.handlersTimeout);
     });
 
-    test('Returns highest time from the array of objects', function() {
+    it('Returns highest time from the array of objects', function() {
       const args = [{
         'timeout': 2500
       }, {
@@ -890,7 +884,7 @@
       assert.equal(result, args[1].timeout);
     });
 
-    test('Returns default time for lower timeouts in argument object', function() {
+    it('Returns default time for lower timeouts in argument object', function() {
       const args = [{
         'timeout': 100
       }, {
@@ -902,13 +896,13 @@
       assert.equal(result, element.handlersTimeout);
     });
 
-    test('Returns -1 when handlersTimeout is removed', function() {
+    it('Returns -1 when handlersTimeout is removed', function() {
       element.handlersTimeout = 0;
       const result = element._computeHandlersTimeout();
       assert.equal(result, -1);
     });
 
-    test('Returns -1 when any of timeouts in array is 0', function() {
+    it('Returns -1 when any of timeouts in array is 0', function() {
       assert.isAbove(element.handlersTimeout, 0);
       const args = [{
         'timeout': 100
@@ -922,27 +916,27 @@
     });
   });
 
-  suite('_clearBeforeRequestTimeout', function() {
+  describe('_clearBeforeRequestTimeout', function() {
     let element;
-    setup(function() {
-      element = fixture('Basic');
+    beforeEach(async function() {
+      element = await basicFixture();
       const _r = Object.assign({}, request);
       element._queue[request.id] = _r;
     });
 
-    test('Clears the variable', function() {
+    it('Clears the variable', function() {
       element._queue[request.id]._currentTimeout = 'test';
       element._clearBeforeRequestTimeout(request.id);
       assert.isUndefined(element._queue[request.id]._currentTimeout);
     });
 
-    test('Do nothing when variable is empty', function() {
+    it('Do nothing when variable is empty', function() {
       element._clearBeforeRequestTimeout(request.id);
       // Basically it doesn't throws an error.
       assert.isUndefined(element._queue[request.id]._currentTimeout);
     });
 
-    test('Clears existing timeout', function(done) {
+    it('Clears existing timeout', function(done) {
       let errored = false;
       element._queue[request.id]._currentTimeout = window.setTimeout(function() {
         errored = true;
@@ -956,15 +950,15 @@
     });
   });
 
-  suite('_continueRequestHandler()', () => {
+  describe('_continueRequestHandler()', () => {
     let element;
-    setup(function() {
-      element = fixture('Basic');
+    beforeEach(async function() {
+      element = await basicFixture();
       const _r = Object.assign({}, request);
       element._queue[request.id] = _r;
     });
 
-    test('Does nothing when request not defined', () => {
+    it('Does nothing when request not defined', () => {
       const spy = sinon.spy(element, 'continueRequest');
       element._continueRequestHandler({
         detail: {
@@ -974,7 +968,7 @@
       assert.isFalse(spy.called);
     });
 
-    test('Calls continueRequest()', () => {
+    it('Calls continueRequest()', () => {
       const spy = sinon.spy(element, 'continueRequest');
       element._continueRequestHandler({
         detail: {
@@ -986,11 +980,11 @@
     });
   });
 
-  suite('continueRequest()', () => {
+  describe('continueRequest()', () => {
     let element;
     let request;
-    setup(function() {
-      element = fixture('Basic');
+    beforeEach(async function() {
+      element = await basicFixture();
       request = {
         url: 'http:domain.com',
         method: 'GET',
@@ -1000,14 +994,14 @@
       element._queue[request.id] = request;
     });
 
-    test('Does nothing when _awaitingContinue flag is set', () => {
+    it('Does nothing when _awaitingContinue flag is set', () => {
       request._awaitingContinue = false;
       const spy = sinon.spy(element, '_continueRequest');
       element.continueRequest(request);
       assert.isFalse(spy.called);
     });
 
-    test('Does nothing when _beforePromisesResolved flag is not set', () => {
+    it('Does nothing when _beforePromisesResolved flag is not set', () => {
       request._awaitingContinue = true;
       request._beforePromisesResolved = false;
       const spy = sinon.spy(element, '_continueRequest');
@@ -1015,14 +1009,14 @@
       assert.isFalse(spy.called);
     });
 
-    test('Re-sets _awaitingContinue flag', () => {
+    it('Re-sets _awaitingContinue flag', () => {
       request._awaitingContinue = true;
       request._beforePromisesResolved = false;
       element.continueRequest(request);
       assert.isFalse(element._awaitingContinue);
     });
 
-    test('Calls _continueRequest()', () => {
+    it('Calls _continueRequest()', () => {
       request._awaitingContinue = true;
       request._beforePromisesResolved = true;
       const spy = sinon.spy(element, '_continueRequest');
@@ -1031,11 +1025,11 @@
     });
   });
 
-  suite('_continueRequest()', () => {
+  describe('_continueRequest()', () => {
     let element;
     let request;
-    setup(function() {
-      element = fixture('Basic');
+    beforeEach(async function() {
+      element = await basicFixture();
       request = {
         url: 'http:domain.com',
         method: 'GET',
@@ -1044,7 +1038,7 @@
       element._queue[request.id] = request;
     });
 
-    test('Calls _clearBeforeRequestTimeout()', () => {
+    it('Calls _clearBeforeRequestTimeout()', () => {
       const spy = sinon.spy(element, '_clearBeforeRequestTimeout');
       element._continueRequest(request);
       assert.isTrue(spy.called);
@@ -1054,7 +1048,7 @@
       'promises', 'reason', '_beforePromisesResolved', '_awaitingContinue',
       '_beforeTimedOut', '_currentTimeout', '_cancelled'
     ].forEach((prop) => {
-      test('Clears ' + prop + ' property', () => {
+      it('Clears ' + prop + ' property', () => {
         let data;
         element.addEventListener('transport-request', function f(e) {
           element.removeEventListener('transport-request', f);
@@ -1067,11 +1061,11 @@
     });
   });
 
-  suite('_resendHandler()', () => {
+  describe('_resendHandler()', () => {
     let element;
     let request;
-    setup(function() {
-      element = fixture('Basic');
+    beforeEach(async function() {
+      element = await basicFixture();
       request = {
         url: 'http:domain.com',
         method: 'GET',
@@ -1080,7 +1074,7 @@
       element._queue[request.id] = request;
     });
 
-    test('Does nothing when request not in the queue', () => {
+    it('Does nothing when request not in the queue', () => {
       const spy = sinon.spy(element, 'processRequest');
       element._resendHandler({
         detail: {
@@ -1090,7 +1084,7 @@
       assert.isFalse(spy.called);
     });
 
-    test('Calls processRequest()', () => {
+    it('Calls processRequest()', () => {
       const spy = sinon.spy(element, 'processRequest');
       element._resendHandler({
         detail: {
@@ -1101,11 +1095,11 @@
     });
   });
 
-  suite('_reportHandler()', () => {
+  describe('_reportHandler()', () => {
     let element;
     let request;
-    setup(function() {
-      element = fixture('Basic');
+    beforeEach(async function() {
+      element = await basicFixture();
       request = {
         url: 'http:domain.com',
         method: 'GET',
@@ -1114,7 +1108,7 @@
       element._queue[request.id] = request;
     });
 
-    test('Does nothing when request not in the queue', () => {
+    it('Does nothing when request not in the queue', () => {
       const spy = sinon.spy(element, '_reportResponse');
       element._reportHandler({
         detail: {
@@ -1124,7 +1118,7 @@
       assert.isFalse(spy.called);
     });
 
-    test('Removes element from the queue', () => {
+    it('Removes element from the queue', () => {
       element._reportHandler({
         detail: {
           id: request.id
@@ -1133,7 +1127,7 @@
       assert.isUndefined(element._queue[request.id]);
     });
 
-    test('Calls _reportResponse()', () => {
+    it('Calls _reportResponse()', () => {
       const spy = sinon.spy(element, '_reportResponse');
       element._reportHandler({
         detail: {
@@ -1144,12 +1138,12 @@
     });
   });
 
-  suite('_reportResponse()', () => {
+  describe('_reportResponse()', () => {
     let element;
     let request;
     let response;
-    setup(function() {
-      element = fixture('Basic');
+    beforeEach(async function() {
+      element = await basicFixture();
       request = {
         url: 'http:domain.com',
         method: 'GET',
@@ -1171,12 +1165,12 @@
       element._queue[request.id] = request;
     });
 
-    test('Resolves promise when no response actions', () => {
+    it('Resolves promise when no response actions', () => {
       const result = element._reportResponse(request, response);
       assert.typeOf(result.then, 'function');
     });
 
-    test('Calls _processResponseActions() when has actions', () => {
+    it('Calls _processResponseActions() when has actions', () => {
       request.responseActions = [{}];
       const spy = sinon.spy(element, '_processResponseActions');
       return element._reportResponse(request, response)
@@ -1189,13 +1183,13 @@
     });
   });
 
-  suite('_processResponseActions()', () => {
+  describe('_processResponseActions()', () => {
     let element;
     let request;
     let response;
     let actions;
-    setup(function() {
-      element = fixture('Basic');
+    beforeEach(async function() {
+      element = await basicFixture();
       request = {
         url: 'http:domain.com',
         method: 'GET'
@@ -1210,7 +1204,7 @@
       actions = [{}];
     });
 
-    test('Dispatches "run-response-actions" event', () => {
+    it('Dispatches "run-response-actions" event', () => {
       const spy = sinon.spy();
       element.addEventListener('run-response-actions', spy);
       element._processResponseActions(actions, request, response);
@@ -1221,7 +1215,7 @@
       assert.deepEqual(detail.response, response, 'response is set');
     });
 
-    test('Returns result of the event', () => {
+    it('Returns result of the event', () => {
       element.addEventListener('run-response-actions', function f(e) {
         element.removeEventListener('run-response-actions', f);
         e.preventDefault();
@@ -1234,7 +1228,7 @@
     });
   });
 
-  suite('_prepareTransportObject()', function() {
+  describe('_prepareTransportObject()', function() {
     let element;
     const orig = {
       a: 'v1',
@@ -1243,22 +1237,24 @@
       id: 1
     };
 
-    setup(function() {
-      element = fixture('Basic');
+    beforeEach(async function() {
+      element = await basicFixture();
     });
 
-    test('Creates copy of the object', function() {
+    it('Creates copy of the object', function() {
       const result = element._prepareTransportObject(Object.assign({}, orig));
       assert.deepEqual(result, orig);
     });
 
-    test('Values are immutable', function() {
+    it('Values are immutable', function() {
       const result = element._prepareTransportObject(Object.assign({}, orig));
       try {
         result.a = 'a1';
         result.b = 'a2';
         result.c = 'a3';
-      } catch (_) {}
+      } catch (_) {
+        assert.isTrue(true, 'stupid linter');
+      }
       assert.equal(result.a, orig.a);
       assert.equal(result.b, orig.b);
       assert.equal(result.c, orig.c);
@@ -1268,10 +1264,10 @@
     });
   });
 
-  suite('Before request event', () => {
+  describe('Before request event', () => {
     let element;
-    setup(function() {
-      element = fixture('Basic');
+    beforeEach(async function() {
+      element = await basicFixture();
     });
     const contextFactory = function(e) {
       e.preventDefault();
@@ -1298,22 +1294,22 @@
       }];
     };
 
-    suiteSetup(function() {
+    before(function() {
       window.addEventListener('environment-current', contextFactory);
     });
 
-    suiteTeardown(function() {
+    after(function() {
       window.removeEventListener('environment-current', contextFactory);
     });
 
-    test('Dispatches before-request custom event', (done) => {
+    it('Dispatches before-request custom event', (done) => {
       element.addEventListener('before-request', () => {
         done();
       });
       element.processRequest(request);
     });
 
-    test('before-request has evaluated variables', (done) => {
+    it('before-request has evaluated variables', (done) => {
       element.addEventListener('before-request', (e) => {
         assert.equal(e.detail.url, 'https://domain.com/value1', 'URL is set');
         assert.equal(e.detail.headers,
@@ -1324,7 +1320,7 @@
       element.processRequest(request);
     });
 
-    test('before-request event is cancelable', (done) => {
+    it('before-request event is cancelable', (done) => {
       element.addEventListener('before-request', (e) => {
         assert.isTrue(e.cancelable);
         done();
@@ -1332,7 +1328,7 @@
       element.processRequest(request);
     });
 
-    test('Dispatches transport-request event', (done) => {
+    it('Dispatches transport-request event', (done) => {
       element.addEventListener('transport-request', () => {
         done();
       });
@@ -1340,20 +1336,20 @@
     });
   });
 
-  suite('Full request flow', () => {
-    suite('Without middleware', () => {
-      suiteSetup(() => {
+  describe('Full request flow', () => {
+    describe('Without middleware', () => {
+      before(() => {
         document.querySelector('demo-transport').enabled = true;
       });
 
-      suiteTeardown(() => {
+      after(() => {
         document.querySelector('demo-transport').enabled = false;
       });
 
       let element;
       let requests;
-      setup(function() {
-        element = fixture('Basic');
+      beforeEach(async function() {
+        element = await basicFixture();
         requests = [{
           id: 'r1',
           url: location.href,
@@ -1368,7 +1364,7 @@
         }];
       });
 
-      test('Runs the flow from the event', (done) => {
+      it('Runs the flow from the event', (done) => {
         element.addEventListener('api-response', function f(e) {
           element.removeEventListener('api-response', f);
           assert.isFalse(e.cancelable, 'Event is not cancelable');
@@ -1388,7 +1384,7 @@
         }));
       });
 
-      test('Runs the flow from function call', (done) => {
+      it('Runs the flow from function call', (done) => {
         element.addEventListener('api-response', function f(e) {
           element.removeEventListener('api-response', f);
           assert.isFalse(e.cancelable, 'Event is not cancelable');
@@ -1403,7 +1399,7 @@
         element.processRequest(Object.assign({}, requests[0]));
       });
 
-      test('Runs the flow when response error', (done) => {
+      it('Runs the flow when response error', (done) => {
         element.addEventListener('api-response', function f(e) {
           element.removeEventListener('api-response', f);
           assert.isFalse(e.cancelable, 'Event is not cancelable');
@@ -1420,6 +1416,4 @@
       });
     });
   });
-  </script>
-</body>
-</html>
+});

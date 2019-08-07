@@ -11,10 +11,10 @@ WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
 License for the specific language governing permissions and limitations under
 the License.
 */
-import {PolymerElement} from '../../@polymer/polymer/polymer-element.js';
-import {afterNextRender} from '../../@polymer/polymer/lib/utils/render-status.js';
-import {EventsTargetMixin} from '../../@advanced-rest-client/events-target-mixin/events-target-mixin.js';
-import '../../@advanced-rest-client/variables-evaluator/variables-evaluator.js';
+import { LitElement } from 'lit-element';
+import { EventsTargetMixin } from '@advanced-rest-client/events-target-mixin/events-target-mixin.js';
+import '@advanced-rest-client/variables-evaluator/variables-evaluator.js';
+function noop() {}
 /**
  * `arc-request-logic`
  *
@@ -34,7 +34,7 @@ import '../../@advanced-rest-client/variables-evaluator/variables-evaluator.js';
  * @memberof ApiElements
  * @appliesMixin EventsTargetMixin
  */
-class ArcRequestLogic extends EventsTargetMixin(PolymerElement) {
+class ArcRequestLogic extends EventsTargetMixin(LitElement) {
   static get properties() {
     return {
       /**
@@ -44,60 +44,47 @@ class ArcRequestLogic extends EventsTargetMixin(PolymerElement) {
        * is not applied and the element waits with the request until
        * `continue-request` event is fired.
        */
-      handlersTimeout: {
-        type: Number,
-        value: 2000
-      },
+      handlersTimeout: { type: Number },
       /**
        * When set variables parsing is not performed.
        * Actions are eqecuted even when this is set.
        */
-      variablesDisabled: Boolean,
+      variablesDisabled: { type: Boolean },
       /**
        * A map of currently handled requests.
        * Keys are requests IDs generated in the request editor.
        * @type {Object}
        */
-      _queue: {
-        type: Object,
-        value() {
-          return {};
-        }
-      },
+      _queue: { type: Object },
       /**
        * A reference name to the Jexl object.
        * Use dot notation to access it from the `window` object.
        * To set class pointer use `jexl` property.
        */
-      jexlPath: String,
+      jexlPath: { type: String },
       /**
        * A Jexl class reference.
        * If this value is set it must be a pointer to the Jexl class and
        * `jexlPath` is ignored.
        * This property is set automatically when `jexlPath` is processed.
        */
-      jexl: Object
+      jexl: { type: Object }
     };
-  }
-
-  static get template() {
-    const template = document.createElement('template');
-    return template;
   }
   /**
    * Returns a reference to the `variables-evaluator` element.
    * @return {Element}
    */
   get evalElement() {
-    if (!this.$.eval) {
-      this.$.eval = document.createElement('variables-evaluator');
-      this.$.eval.noBeforeRequest = true;
-      this.$.eval.eventTarget = this.eventsTarget;
-      this.$.eval.jexlPath = this.jexlPath;
-      this.$.eval.jexl = this.jexl;
-      this.shadowRoot.appendChild(this.$.eval);
+    if (!this._eval) {
+      this._eval = document.createElement('variables-evaluator');
+      this._eval.noBeforeRequest = true;
+      this._eval.eventTarget = this.eventsTarget;
+      this._eval.jexlPath = this.jexlPath;
+      this._eval.jexl = this.jexl;
+      this.shadowRoot.appendChild(this._eval);
     }
-    return this.$.eval;
+    return this._eval;
   }
 
   constructor() {
@@ -106,6 +93,9 @@ class ArcRequestLogic extends EventsTargetMixin(PolymerElement) {
     this._continueRequestHandler = this._continueRequestHandler.bind(this);
     this._resendHandler = this._resendHandler.bind(this);
     this._reportHandler = this._reportHandler.bind(this);
+
+    this.handlersTimeout = 2000;
+    this._queue = {};
   }
 
   _attachListeners(node) {
@@ -132,9 +122,7 @@ class ArcRequestLogic extends EventsTargetMixin(PolymerElement) {
     e.stopImmediatePropagation();
     const request = e.detail;
     this.processRequest(request);
-    afterNextRender(this, () => {
-      this._reportUrlHistory(request.url);
-    });
+    setTimeout(() => this._reportUrlHistory(request.url));
   }
   /**
    * Dispatches `url-history-store` custom event which is a part of request logic
@@ -160,10 +148,10 @@ class ArcRequestLogic extends EventsTargetMixin(PolymerElement) {
    * @param {Object} request ARC request object
    * @return {Promise}
    */
-  processRequest(request) {
+  async processRequest(request) {
     const copy = this._prepareEventRequest(request);
     this._queue[copy.id] = copy;
-    return this._beforeProcessVariables(copy);
+    return await this._beforeProcessVariables(copy);
   }
   /**
    * Prepares a request object to be used to send it with the `before-request`
@@ -194,17 +182,17 @@ class ArcRequestLogic extends EventsTargetMixin(PolymerElement) {
    * @param {Object} request ARC request object
    * @return {Promise}
    */
-  _beforeProcessVariables(request) {
-    return this._preparePreRequestVariables(request)
-    .then((override) => {
+  async _beforeProcessVariables(request) {
+    try {
+      const override = await this._preparePreRequestVariables(request);
       this._notifyVariablesChange(override);
-      if (this.variablesDisabled) {
-        return Promise.resolve(request);
+      if (!this.variablesDisabled) {
+        request = await this.evalElement.processBeforeRequest(request, override);
       }
-      return this.evalElement.processBeforeRequest(request, override);
-    })
-    .then((request) => this._beforeRequest(request))
-    .catch(() => this._beforeRequest(request));
+    } catch (_) {
+      noop();
+    }
+    return await this._beforeRequest(request);
   }
   /**
    * Prepares scripts context override values for variables evaluator.
@@ -215,14 +203,14 @@ class ArcRequestLogic extends EventsTargetMixin(PolymerElement) {
    * @return {Promise} Promise resolved to an object of variables
    * or undefined if actions not defined.
    */
-  _preparePreRequestVariables(request) {
+  async _preparePreRequestVariables(request) {
     const actions = request.requestActions;
     if (!actions) {
-      return Promise.resolve();
+      return;
     }
     const vars = actions.variables;
     if (!vars || !vars.length) {
-      return Promise.resolve();
+      return;
     }
     const result = {};
     vars.forEach((item) => {
@@ -232,7 +220,7 @@ class ArcRequestLogic extends EventsTargetMixin(PolymerElement) {
       result[item.variable] = item.value;
     });
     const _eval = this.evalElement;
-    return _eval.evaluateVariables(result);
+    return await _eval.evaluateVariables(result);
   }
   /**
    * Notifies listeners when variable update action changes
@@ -275,43 +263,41 @@ class ArcRequestLogic extends EventsTargetMixin(PolymerElement) {
    * @param {Object} request ARC request object after variables evaluation.
    * @return {Promise}
    */
-  _beforeRequest(request) {
+  async _beforeRequest(request) {
     const ID = request.id;
     const bre = this._dispatchBeforeRequest(request);
     if (bre.defaultPrevented) {
       this._reportCancelation(bre.detail.reason);
-      return Promise.resolve();
+      return;
     }
-    let p = bre.detail.promises;
+    const p = bre.detail.promises;
     if (p && p.length) {
       this._queue[ID]._beforePromisesResolved = false;
       const timeout = this._computeHandlersTimeout(p);
-      p = Promise.all(p);
       if (timeout > 0) {
         this._queue[ID]._currentTimeout =
           window.setTimeout(() => this._onBeforeRequestTimeout(ID), timeout);
       } else {
         this._queue[ID]._awaitingContinue = true;
       }
-    } else {
-      p = Promise.resolve();
+      try {
+        await Promise.all(p);
+      } catch (cause) {
+        this._reportError(ID, cause);
+        return;
+      }
     }
-    return p.then(() => {
-      if (!this._queue[ID]) {
-        return;
-      }
-      this._queue[ID]._beforePromisesResolved = true;
-      if (this._queue[ID]._beforeTimedOut || this._queue[ID]._cancelled) {
-        return;
-      }
-      if (!this._queue[ID]._awaitingContinue) {
-        this._continueRequest(request);
-      }
-    })
-    .catch((cause) => {
-      this._reportError(ID, cause);
-      console.warn(cause);
-    });
+
+    if (!this._queue[ID]) {
+      return;
+    }
+    this._queue[ID]._beforePromisesResolved = true;
+    if (this._queue[ID]._beforeTimedOut || this._queue[ID]._cancelled) {
+      return;
+    }
+    if (!this._queue[ID]._awaitingContinue) {
+      this._continueRequest(request);
+    }
   }
   /**
    * Dispatches `api-response` event
@@ -400,7 +386,6 @@ class ArcRequestLogic extends EventsTargetMixin(PolymerElement) {
   _onBeforeRequestTimeout(id) {
     this._queue[id]._currentTimeout = undefined;
     this._queue[id]._beforeTimedOut = true;
-    console.warn('The before-request event handlers timed out.');
     this._continueRequest(this._queue[id]);
   }
   /**
@@ -508,19 +493,16 @@ class ArcRequestLogic extends EventsTargetMixin(PolymerElement) {
    * @param {Object} arcResponse ArcResponse object
    * @return {Promise}
    */
-  _reportResponse(request, arcResponse) {
-    let p;
+  async _reportResponse(request, arcResponse) {
     const ra = request.responseActions;
     if (ra && ra.length) {
-      p = this._processResponseActions(ra, arcResponse.request, arcResponse.response);
-    } else {
-      p = Promise.resolve();
+      try {
+        await this._processResponseActions(ra, arcResponse.request, arcResponse.response);
+      } catch (_) {
+        noop();
+      }
     }
-    return p
-    .catch(() => {})
-    .then(() => {
-      this._disaptchResponse(arcResponse);
-    });
+    this._disaptchResponse(arcResponse);
   }
   /**
    * Executes response action before displaying the results.
@@ -530,7 +512,7 @@ class ArcRequestLogic extends EventsTargetMixin(PolymerElement) {
    * @param {Response} response
    * @return {Promise}
    */
-  _processResponseActions(actions, request, response) {
+  async _processResponseActions(actions, request, response) {
     const e = new CustomEvent('run-response-actions', {
       composed: true,
       bubbles: true,
@@ -545,7 +527,6 @@ class ArcRequestLogic extends EventsTargetMixin(PolymerElement) {
     if (e.defaultPrevented) {
       return e.detail.result;
     }
-    return Promise.resolve();
   }
   /**
    * Reports cancelation by any of pre-request handlers.
@@ -553,7 +534,6 @@ class ArcRequestLogic extends EventsTargetMixin(PolymerElement) {
    */
   _reportCancelation(reason) {
     reason = reason || 'The request has been canceled';
-    console.warn(reason);
     this._reportError(new Error(reason));
   }
 

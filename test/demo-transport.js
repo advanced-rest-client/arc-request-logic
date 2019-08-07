@@ -1,12 +1,9 @@
-import {PolymerElement} from '../../../@polymer/polymer/polymer-element.js';
-export class DemoTransport extends PolymerElement {
-  static get is() {
-    return 'demo-transport';
-  }
+import { LitElement } from 'lit-element';
 
+export class DemoTransport extends LitElement {
   static get properties() {
     return {
-      enabled: Boolean
+      enabled: { type: Boolean }
     };
   }
 
@@ -115,4 +112,4 @@ export class DemoTransport extends PolymerElement {
     return headers;
   }
 }
-window.customElements.define(DemoTransport.is, DemoTransport);
+window.customElements.define('demo-transport', DemoTransport);
