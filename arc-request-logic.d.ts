@@ -5,13 +5,16 @@
  *   https://github.com/Polymer/tools/tree/master/packages/gen-typescript-declarations
  *
  * To modify these typings, edit the source file(s):
- *   arc-request-logic.html
+ *   arc-request-logic.js
  */
 
-/// <reference path="../polymer/types/polymer-element.d.ts" />
-/// <reference path="../polymer/types/lib/utils/render-status.d.ts" />
-/// <reference path="../events-target-behavior/events-target-behavior.d.ts" />
-/// <reference path="../variables-evaluator/variables-evaluator.d.ts" />
+
+// tslint:disable:variable-name Describing an API that's defined elsewhere.
+// tslint:disable:no-any describes the API as best we are able today
+
+import {LitElement} from 'lit-element';
+
+import {EventsTargetMixin} from '@advanced-rest-client/events-target-mixin/events-target-mixin.js';
 
 declare namespace ApiElements {
 
@@ -28,7 +31,9 @@ declare namespace ApiElements {
    * ----------------|-------------|----------
    * `--arc-request-logic` | Mixin applied to this elment | `{}`
    */
-  class ArcRequestLogic {
+  class ArcRequestLogic extends
+    EventsTargetMixin(
+    Object) {
 
     /**
      * Returns a reference to the `variables-evaluator` element.
@@ -55,6 +60,21 @@ declare namespace ApiElements {
      * Keys are requests IDs generated in the request editor.
      */
     _queue: object|null;
+
+    /**
+     * A reference name to the Jexl object.
+     * Use dot notation to access it from the `window` object.
+     * To set class pointer use `jexl` property.
+     */
+    jexlPath: string|null|undefined;
+
+    /**
+     * A Jexl class reference.
+     * If this value is set it must be a pointer to the Jexl class and
+     * `jexlPath` is ignored.
+     * This property is set automatically when `jexlPath` is processed.
+     */
+    jexl: object|null|undefined;
     _attachListeners(node: any): void;
     _detachListeners(node: any): void;
 
@@ -250,6 +270,9 @@ declare namespace ApiElements {
   }
 }
 
-interface HTMLElementTagNameMap {
-  "arc-request-logic": ApiElements.ArcRequestLogic;
+declare global {
+
+  interface HTMLElementTagNameMap {
+    "arc-request-logic": ApiElements.ArcRequestLogic;
+  }
 }

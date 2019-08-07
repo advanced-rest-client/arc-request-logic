@@ -1,23 +1,19 @@
 {
   "name": "@advanced-rest-client/arc-request-logic",
   "description": "A request logic for Advanced REST Client excluding HTTP transport.",
-  "version": "2.0.0",
+  "version": "3.0.0",
   "license": "Apache-2.0",
-  "main": "arc-request-logic.html",
+  "main": "arc-request-logic.js",
+  "keywords": [
+    "api-components",
+    "advanced-rest-client",
+    "request-processor",
+    "request-logic"
+  ],
   "authors": [
     "Pawel Psztyc",
     "The Advanced REST client authors <arc@mulesoft.com>"
   ],
-  "devDependencies": {
-    "@polymer/gen-typescript-declarations": "^1.5.1"
-  },
-  "private": false,
-  "scripts": {
-    "lint": "polymer lint arc-request-logic.html",
-    "test-sauce": "polymer test --plugin sauce --job-name \"arc-request-logic:local-test\"",
-    "test": "polymer test --plugin local",
-    "update-types": "gen-typescript-declarations --deleteExisting --outDir ."
-  },
   "repository": {
     "type": "git",
     "url": "git://github.com/advanced-rest-client/arc-request-logic.git"
@@ -25,5 +21,64 @@
   "bugs": {
     "url": "https://github.com/advanced-rest-client/arc-request-logic/issues",
     "email": "arc@mulesoft.com"
+  },
+  "contributors": [
+    "Pawel Psztyc",
+    "The Advanced REST client authors <arc@mulesoft.com>"
+  ],
+  "dependencies": {
+    "@advanced-rest-client/events-target-mixin": "^3.0.0",
+    "@advanced-rest-client/variables-evaluator": "^3.0.0",
+    "lit-element": "^2.2.1"
+  },
+  "devDependencies": {
+    "@advanced-rest-client/arc-models": "^3.0.0-preview.7",
+    "@advanced-rest-client/variables-manager": "^3.0.0",
+    "@advanced-rest-client/arc-demo-helper": "^1.0.9",
+    "@advanced-rest-client/eslint-config": "^1.0.6",
+    "@advanced-rest-client/prettier-config": "^0.1.0",
+    "@advanced-rest-client/testing-karma-sl": "^1.0.3",
+    "@babel/core": "^7.5.5",
+    "@babel/preset-env": "^7.5.5",
+    "@commitlint/cli": "^8.1.0",
+    "@commitlint/config-conventional": "^7.0.0",
+    "@open-wc/testing": "^2.2.1",
+    "@open-wc/testing-karma": "^3.1.5",
+    "@polymer/gen-typescript-declarations": "^1.6.2",
+    "@polymer/iron-test-helpers": "^3.0.0",
+    "babel-plugin-minify-mangle-names": "^0.5.0",
+    "browserify": "^16.3.0",
+    "fs-extra": "^7.0.1",
+    "jexl": "^2.1.1",
+    "uglify-js": "^3.6.0",
+    "sinon": "^7.3.2",
+    "deepmerge": "^4.0.0",
+    "es-dev-server": "^1.8.3",
+    "husky": "^1.0.0",
+    "karma": "^4.2.0",
+    "lint-staged": "^9.2.1"
+  },
+  "scripts": {
+    "test": "karma start --coverage",
+    "update-types": "gen-typescript-declarations --deleteExisting --outDir .",
+    "start": "es-dev-server --app-index demo/index.html --node-resolve --open --watch",
+    "start:compatibility": "es-dev-server --app-index demo/index.html --compatibility all --node-resolve --open --watch",
+    "lint:eslint": "eslint --ext .js,.html .",
+    "format:eslint": "eslint --ext .js,.html . --fix",
+    "lint:prettier": "prettier \"**/*.js\" --list-different || (echo '↑↑ these files are not prettier formatted ↑↑' && exit 1)",
+    "format:prettier": "prettier \"**/*.js\" --write",
+    "lint": "npm run lint:eslint && npm run lint:prettier",
+    "format": "npm run format:eslint && npm run format:prettier",
+    "test:watch": "karma start --auto-watch=true --single-run=false",
+    "test:legacy": "karma start --legacy --coverage",
+    "test:legacy:watch": "karma start --legacy --auto-watch=true --single-run=false",
+    "test:sl": "karma start karma.sl.config.js --legacy --coverage",
+    "prepare": "node dev-lib/prepare.js"
+  },
+  "lint-staged": {
+    "*.js": [
+      "eslint --fix",
+      "git add"
+    ]
   }
 }

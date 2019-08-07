@@ -1,26 +1,9 @@
-<!--
-@license
-Copyright 2018 The Advanced REST client authors <arc@mulesoft.com>
-Licensed under the Apache License, Version 2.0 (the "License"); you may not
-use this file except in compliance with the License. You may obtain a copy of
-the License at
-http://www.apache.org/licenses/LICENSE-2.0
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
-WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
-License for the specific language governing permissions and limitations under
-the License.
--->
-<link rel="import" href="../../polymer/polymer-element.html">
-<script>
-class DemoTransport extends Polymer.Element {
-  static get is() {
-    return 'demo-transport';
-  }
+import { LitElement } from 'lit-element';
 
+export class DemoTransport extends LitElement {
   static get properties() {
     return {
-      enabled: Boolean
+      enabled: { type: Boolean }
     };
   }
 
@@ -118,8 +101,8 @@ class DemoTransport extends Polymer.Element {
   _computeHeaders(input) {
     const headers = {};
     if (input) {
-      input.split('\n').forEach(line => {
-        var parts = line.split(':');
+      input.split('\n').forEach((line) => {
+        const parts = line.split(':');
         if (parts[1]) {
           parts[1] = parts[1].trim();
         }
@@ -129,5 +112,4 @@ class DemoTransport extends Polymer.Element {
     return headers;
   }
 }
-window.customElements.define(DemoTransport.is, DemoTransport);
-</script>
+window.customElements.define('demo-transport', DemoTransport);
