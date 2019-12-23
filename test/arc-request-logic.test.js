@@ -1,5 +1,7 @@
-import { fixture, assert } from '@open-wc/testing';
-import sinon from 'sinon/pkg/sinon-esm.js';
+import { fixture, assert, html } from '@open-wc/testing';
+import { DataGenerator } from '@advanced-rest-client/arc-data-generator/arc-data-generator.js';
+import sinon from 'sinon';
+import '@advanced-rest-client/arc-models/client-certificate-model.js';
 import '../arc-request-logic.js';
 import './demo-transport.js';
 
@@ -12,6 +14,14 @@ describe('<arc-request-logic>', function() {
     return await fixture(`<arc-request-logic variablesdisabled jexlpath="ArcVariables.JexlDev"></arc-request-logic>`);
   }
 
+  async function certificatesFixture() {
+    const element = await fixture(html`<div>
+      <client-certificate-model></client-certificate-model>
+      <arc-request-logic variablesdisabled jexlpath="ArcVariables.JexlDev"></arc-request-logic>
+    </div>`);
+    return element.querySelector('arc-request-logic');
+  };
+
   before(() => {
     const transport = document.createElement('demo-transport');
     document.body.appendChild(transport);
@@ -21,6 +31,15 @@ describe('<arc-request-logic>', function() {
     const transport = document.querySelector('demo-transport');
     document.body.removeChild(transport);
   });
+
+  function untilTransportRequest(element) {
+    return new Promise((resolve) => {
+      element.addEventListener('transport-request', function f(e) {
+        element.removeEventListener('transport-request', f);
+        resolve(e);
+      });
+    });
+  }
 
   const request = {
     id: 'test-id',
@@ -317,88 +336,54 @@ describe('<arc-request-logic>', function() {
       element = await basicFixture();
     });
 
-    it('Processes all variables', function(done) {
-      element.addEventListener('transport-request', function f(e) {
-        element.removeEventListener('transport-request', f);
-        const result = e.detail;
-        assert.equal(result.url, 'https://domain.com/value1');
-        assert.equal(result.headers, 'content-length: 0\nx-test: true\nx-var: value2 value1');
-        assert.equal(result.payload, 'value1');
-        done();
-      });
+    it('Processes all variables', async () => {
       const r = Object.assign({}, request);
       element._queue[r.id] = r;
-      element._beforeProcessVariables(r);
+      const result = await element._beforeProcessVariables(r);
+      assert.equal(result.url, 'https://domain.com/value1');
+      assert.equal(result.headers, 'content-length: 0\nx-test: true\nx-var: value2 value1');
+      assert.equal(result.payload, 'value1');
     });
 
-    it('Calls _beforeRequest() when error', (done) => {
-      const r = Object.assign({}, request);
-      element._queue[r.id] = r;
-      element._preparePreRequestVariables = () => Promise.reject();
-      const spy = sinon.spy(element, '_beforeRequest');
-      element.addEventListener('transport-request', function f() {
-        element.removeEventListener('transport-request', f);
-        assert.isTrue(spy.called);
-        done();
-      });
-      element._beforeProcessVariables(r);
-    });
-
-    it('Calls _preparePreRequestVariables()', () => {
+    it('Calls _preparePreRequestVariables()', async () => {
       const r = Object.assign({}, request);
       element._queue[r.id] = r;
       const spy = sinon.spy(element, '_preparePreRequestVariables');
-      return element._beforeProcessVariables(r)
-      .then(() => {
-        assert.isTrue(spy.called);
-        assert.deepEqual(spy.args[0][0], r);
-      });
+      await  element._beforeProcessVariables(r)
+      assert.isTrue(spy.called);
+      assert.deepEqual(spy.args[0][0], r);
     });
 
-    it('Calls _notifyVariablesChange()', () => {
+    it('Calls _notifyVariablesChange()', async () => {
       const r = Object.assign({}, request);
       element._queue[r.id] = r;
       const spy = sinon.spy(element, '_notifyVariablesChange');
-      return element._beforeProcessVariables(r)
-      .then(() => {
-        assert.isTrue(spy.called);
-        assert.typeOf(spy.args[0][0], 'object');
-      });
+      await element._beforeProcessVariables(r)
+      assert.isTrue(spy.called);
+      assert.typeOf(spy.args[0][0], 'object');
     });
 
-    it('Calls processBeforeRequest()', () => {
+    it('Calls processBeforeRequest()', async () => {
       const r = Object.assign({}, request);
       element._queue[r.id] = r;
       const spy = sinon.spy(element.evalElement, 'processBeforeRequest');
-      return element._beforeProcessVariables(r)
-      .then(() => {
-        assert.isTrue(spy.called);
-        assert.deepEqual(spy.args[0][0], r);
-        assert.typeOf(spy.args[0][1], 'object');
-      });
+      await  element._beforeProcessVariables(r)
+      assert.isTrue(spy.called);
+      assert.deepEqual(spy.args[0][0], r);
+      assert.typeOf(spy.args[0][1], 'object');
     });
   });
 
   describe('Variables disabled', function() {
     let element;
-    let result;
-
-    async function untilBeforeRequest(element) {
-      return new Promise((resolve) => {
-        element._beforeRequest = function(data) {
-          resolve(data);
-        };
-      });
-    }
 
     beforeEach(async () => {
       element = await varsDisabledFixture();
-      const _request = Object.assign({}, request);
-      element._beforeProcessVariables(_request);
-      result = await untilBeforeRequest(element);
     });
 
-    it('Does not evaluates variables', function() {
+    it('Does not evaluates variables', async () => {
+      const _request = Object.assign({}, request);
+      const result = await element._beforeProcessVariables(_request);
       assert.equal(result.url, request.url);
       assert.equal(result.headers, request.headers);
       assert.equal(result.payload, request.payload);
@@ -1044,19 +1029,17 @@ describe('<arc-request-logic>', function() {
       assert.isTrue(spy.called);
       assert.equal(spy.args[0][0], request.id);
     });
+
     [
       'promises', 'reason', '_beforePromisesResolved', '_awaitingContinue',
       '_beforeTimedOut', '_currentTimeout', '_cancelled'
     ].forEach((prop) => {
-      it('Clears ' + prop + ' property', () => {
-        let data;
-        element.addEventListener('transport-request', function f(e) {
-          element.removeEventListener('transport-request', f);
-          data = e.detail;
-        });
+      it('Clears ' + prop + ' property', async () => {
+
         request[prop] = 'test-value';
         element._continueRequest(request);
-        assert.isUndefined(data[prop]);
+        const e = await untilTransportRequest(element);
+        assert.isUndefined(e.detail[prop]);
       });
     });
   });
@@ -1413,6 +1396,175 @@ describe('<arc-request-logic>', function() {
           done();
         });
         element.processRequest(requests[1]);
+      });
+    });
+  });
+
+  describe('Authorization data processing', () => {
+    describe('Basic authorization', () => {
+      let request;
+      let element;
+      beforeEach(async () => {
+        element = await varsDisabledFixture();
+        request = {
+          url: 'https://api.domain.com',
+          method: 'GET',
+          auth: {
+            username: 'uname',
+            password: 'passwd',
+          },
+          authType: 'basic'
+        };
+      });
+
+      it('adds authorization header to non existing headers', async () => {
+        const spy = sinon.spy();
+        element.addEventListener('transport-request', spy);
+        await element.processRequest(request);
+        const eventRequest = spy.args[0][0].detail;
+        assert.equal(eventRequest.headers, 'authorization: dW5hbWU6cGFzc3dk');
+      });
+
+      it('adds authorization header to existing headers', async () => {
+        request.headers = 'accept: */*';
+        const spy = sinon.spy();
+        element.addEventListener('transport-request', spy);
+        await element.processRequest(request);
+        const eventRequest = spy.args[0][0].detail;
+        assert.equal(eventRequest.headers, 'accept: */*\nauthorization: dW5hbWU6cGFzc3dk');
+      });
+
+      it('replaces existing authorization header', async () => {
+        request.headers = 'authorization: test';
+        const spy = sinon.spy();
+        element.addEventListener('transport-request', spy);
+        await element.processRequest(request);
+        const eventRequest = spy.args[0][0].detail;
+        assert.equal(eventRequest.headers, 'authorization: dW5hbWU6cGFzc3dk');
+      });
+    });
+
+    describe('OAuth 2', () => {
+      let request;
+      let element;
+      beforeEach(async () => {
+        element = await varsDisabledFixture();
+        request = {
+          url: 'https://api.domain.com',
+          method: 'GET',
+          auth: {
+            tokenType: 'Bearer-test',
+            deliveryMethod: 'header',
+            deliveryName: 'authorization-test',
+            accessToken: 'test-token'
+          },
+          authType: 'oauth 2'
+        };
+      });
+
+      it('adds authorization header to non existing headers', async () => {
+        const spy = sinon.spy();
+        element.addEventListener('transport-request', spy);
+        await element.processRequest(request);
+        const eventRequest = spy.args[0][0].detail;
+        assert.equal(eventRequest.headers, 'authorization-test: Bearer-test test-token');
+      });
+
+      it('adds authorization header to existing headers', async () => {
+        request.headers = 'accept: */*';
+        const spy = sinon.spy();
+        element.addEventListener('transport-request', spy);
+        await element.processRequest(request);
+        const eventRequest = spy.args[0][0].detail;
+        assert.equal(eventRequest.headers, 'accept: */*\nauthorization-test: Bearer-test test-token');
+      });
+
+      it('replaces existing authorization header', async () => {
+        request.headers = 'authorization-test: test';
+        const spy = sinon.spy();
+        element.addEventListener('transport-request', spy);
+        await element.processRequest(request);
+        const eventRequest = spy.args[0][0].detail;
+        assert.equal(eventRequest.headers, 'authorization-test: Bearer-test test-token');
+      });
+
+      it('uses default tokenType', async () => {
+        delete request.auth.tokenType;
+        const spy = sinon.spy();
+        element.addEventListener('transport-request', spy);
+        await element.processRequest(request);
+        const eventRequest = spy.args[0][0].detail;
+        assert.equal(eventRequest.headers, 'authorization-test: Bearer test-token');
+      });
+
+      it('uses default deliveryName', async () => {
+        delete request.auth.deliveryName;
+        const spy = sinon.spy();
+        element.addEventListener('transport-request', spy);
+        await element.processRequest(request);
+        const eventRequest = spy.args[0][0].detail;
+        assert.equal(eventRequest.headers, 'authorization: Bearer-test test-token');
+      });
+
+      it('ignores for unsupported deliveryMethod', async () => {
+        request.auth.deliveryMethod = 'params';
+        const spy = sinon.spy();
+        element.addEventListener('transport-request', spy);
+        await element.processRequest(request);
+        const eventRequest = spy.args[0][0].detail;
+        assert.isUndefined(eventRequest.headers);
+      });
+    });
+
+    describe('Client certificate', () => {
+      let certs;
+      before(async () => {
+        certs = await DataGenerator.insertCertificatesData({});
+      });
+
+      after(async () => {
+        await DataGenerator.destroyClientCertificates();
+      });
+
+      let request;
+      beforeEach(async () => {
+        request = {
+          url: 'https://api.domain.com',
+          method: 'GET',
+          auth: {
+            id: certs[0]._id
+          },
+          authType: 'client certificate'
+        };
+      });
+
+      it('ignores when model is not in the DOM', async () => {
+        const element = await varsDisabledFixture();
+        element.processRequest(request);
+        const e = await untilTransportRequest(element);
+        const eventRequest = e.detail;
+        assert.isUndefined(eventRequest.headers);
+      });
+
+      it('ignores when unknown certificate ID', async () => {
+        const element = await varsDisabledFixture();
+        request.auth.id = 'unknown';
+        element.processRequest(request);
+        const e = await untilTransportRequest(element);
+        const eventRequest = e.detail;
+        assert.isUndefined(eventRequest.headers);
+      });
+
+      it('adds certificate to the configuration', async () => {
+        const element = await certificatesFixture();
+        element.processRequest(request);
+        const e = await untilTransportRequest(element);
+        const eventRequest = e.detail;
+        const cert = eventRequest.clientCertificate;
+        assert.typeOf(cert, 'object', 'has certificate configuration');
+        assert.equal(cert.type, certs[0].type, 'has type');
+        assert.typeOf(cert.cert, 'array', 'has cert');
+        assert.typeOf(cert.key, 'array', 'has key');
       });
     });
   });

@@ -13,8 +13,19 @@ the License.
 */
 import { LitElement } from 'lit-element';
 import { EventsTargetMixin } from '@advanced-rest-client/events-target-mixin/events-target-mixin.js';
+import { HeadersParserMixin } from '@advanced-rest-client/headers-parser-mixin/headers-parser-mixin.js';
 import '@advanced-rest-client/variables-evaluator/variables-evaluator.js';
-function noop() {}
+
+/**
+ * @typedef {Object} RequestObject
+ * @property {string} url
+ * @property {string} method
+ * @property {string=} headers
+ * @property {string|blob|FormData|null} payload
+ * @property {Object=} auth
+ * @property {string=} authType
+ * @property {Object=} config
+ */
 /**
  * `arc-request-logic`
  *
@@ -29,12 +40,11 @@ function noop() {}
  * `--arc-request-logic` | Mixin applied to this elment | `{}`
  *
  * @customElement
- * @polymer
  * @demo demo/index.html
  * @memberof ApiElements
  * @appliesMixin EventsTargetMixin
  */
-class ArcRequestLogic extends EventsTargetMixin(LitElement) {
+class ArcRequestLogic extends EventsTargetMixin(HeadersParserMixin(LitElement)) {
   static get properties() {
     return {
       /**
@@ -149,9 +159,11 @@ class ArcRequestLogic extends EventsTargetMixin(LitElement) {
    * @return {Promise}
    */
   async processRequest(request) {
-    const copy = this._prepareEventRequest(request);
+    let copy = this._prepareEventRequest(request);
     this._queue[copy.id] = copy;
-    return await this._beforeProcessVariables(copy);
+    copy = await this._beforeProcessVariables(copy);
+    await this._beforeRequest(copy);
+    return copy;
   }
   /**
    * Prepares a request object to be used to send it with the `before-request`
@@ -190,9 +202,9 @@ class ArcRequestLogic extends EventsTargetMixin(LitElement) {
         request = await this.evalElement.processBeforeRequest(request, override);
       }
     } catch (_) {
-      noop();
+      // ...
     }
-    return await this._beforeRequest(request);
+    return request;
   }
   /**
    * Prepares scripts context override values for variables evaluator.
@@ -424,7 +436,7 @@ class ArcRequestLogic extends EventsTargetMixin(LitElement) {
    *
    * @param {Object} request The request object
    */
-  _continueRequest(request) {
+  async _continueRequest(request) {
     this._clearBeforeRequestTimeout(request.id);
     // request = Object.assign({}, request);
     delete request.promises;
@@ -434,6 +446,7 @@ class ArcRequestLogic extends EventsTargetMixin(LitElement) {
     delete request._beforeTimedOut;
     delete request._currentTimeout;
     delete request._cancelled;
+    await this._processAuth(request);
     // Changes to the `_requestCopy` object won't affect sent object.
     // However changes made to FormData or File object of the payload property
     // or to the `auth` object will affect send object because those are
@@ -499,7 +512,7 @@ class ArcRequestLogic extends EventsTargetMixin(LitElement) {
       try {
         await this._processResponseActions(ra, arcResponse.request, arcResponse.response);
       } catch (_) {
-        noop();
+        // ...
       }
     }
     this._disaptchResponse(arcResponse);
@@ -538,11 +551,137 @@ class ArcRequestLogic extends EventsTargetMixin(LitElement) {
   }
 
   /**
+   * Processes raw authorization configuration to transform it, if possible,
+   * into correct authorization configuration.
+   *
+   * Currently this method processes authorization for:
+   * - oauth 2
+   * - basic
+   * - client certificates.
+   *
+   * @param {RequestObject} request
+   * @return {Promise}
+   */
+  async _processAuth(request) {
+    switch (request.authType) {
+      case 'client certificate': await this._processClientCertificate(request); break;
+      case 'basic': await this._processBasicAuth(request); break;
+      case 'oauth 2': await this._processOAuth2(request); break;
+    }
+  }
+
+  /**
+   * Adds `clientCertificate` property from authorization configuration.
+   * This requires `client-certificates-model` to be present in the DOM.
+   *
+   * @param {RequestObject} request
+   * @return {Promise}
+   */
+  async _processClientCertificate(request) {
+    const { auth } = request;
+    if (!auth || !auth.id) {
+      return;
+    }
+    const e = new CustomEvent('client-certificate-get', {
+      bubbles: true,
+      cancelable: true,
+      detail: {
+        id: auth.id
+      }
+    });
+    this.dispatchEvent(e);
+    try {
+      const result = await e.detail.result;
+      if (!result) {
+        return;
+      }
+      request.clientCertificate = {
+        type: result.type,
+        cert: [result.cert],
+      };
+      if (result.key) {
+        request.clientCertificate.key = [result.key];
+      }
+    } catch (e) {
+      // ...
+    }
+  }
+
+  /**
+   * Adds `authorization` header for basic authentication.
+   * @param {RequestObject} request
+   * @return {Promise}
+   */
+  async _processBasicAuth(request) {
+    const { auth } = request;
+    if (!auth || !auth.username) {
+      return;
+    }
+    const { username, password } = auth;
+    let headers = this.headersToJSON(request.headers || '');
+    const value = btoa(`${username}:${password || ''}`);
+    headers = this.replaceHeaderValue(headers, 'authorization', value);
+    request.headers = this.headersToString(headers);
+  }
+
+  /**
+   * Processes authorization data for OAuth 2 authorization.
+   * @param {RequestObject} request
+   * @return {Promise}
+   */
+  async _processOAuth2(request) {
+    const { auth } = request;
+    if (!auth) {
+      return;
+    }
+    const { accessToken, tokenType='Bearer', deliveryMethod='header', deliveryName='authorization' } = auth;
+    if (!accessToken) {
+      return;
+    }
+
+    if (deliveryMethod !== 'header') {
+      // TODO (pawel): add support for query parameters delivery method.
+      // Because the authorization panel does not support it right now it is
+      // not implemented, yet.
+      return;
+    }
+    let headers = this.headersToJSON(request.headers || '');
+    const value = `${tokenType} ${accessToken}`;
+    headers = this.replaceHeaderValue(headers, deliveryName, value);
+    request.headers = this.headersToString(headers);
+  }
+
+  /**
    * Dispatched when request is made. This is handled by `urlhistory-model`
    * to store URL history data.
    *
    * @event url-history-store
    * @param {String} value The URL to store.
+   */
+
+  /**
+   * @event variable-update-action
+   */
+  /**
+   * @event before-request
+   */
+  /**
+   * @event api-response
+   */
+  /**
+   * @event transport-request
+   * @param {RequestObject}
+   */
+  /**
+   * @event run-response-actions
+   * @param {Array<Object>} actions
+   * @param {RequestObject} request
+   * @param {Object} response
+   */
+  /**
+   * Dispatched when requesting client certificate data from a data store.
+   * @event client-certificate-get
+   * @param {String} id
    */
 }
 window.customElements.define('arc-request-logic', ArcRequestLogic);

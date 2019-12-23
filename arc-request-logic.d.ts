@@ -16,6 +16,8 @@ import {LitElement} from 'lit-element';
 
 import {EventsTargetMixin} from '@advanced-rest-client/events-target-mixin/events-target-mixin.js';
 
+import {HeadersParserMixin} from '@advanced-rest-client/headers-parser-mixin/headers-parser-mixin.js';
+
 declare namespace ApiElements {
 
   /**
@@ -223,7 +225,7 @@ declare namespace ApiElements {
      *
      * @param request The request object
      */
-    _continueRequest(request: object|null): void;
+    _continueRequest(request: object|null): any;
 
     /**
      * Creates an immutable request data object to be send to the transport
@@ -267,6 +269,33 @@ declare namespace ApiElements {
      * @param reason Error object for the reason.
      */
     _reportCancelation(reason: Error|null): void;
+
+    /**
+     * Processes raw authorization configuration to transform it, if possible,
+     * into correct authorization configuration.
+     *
+     * Currently this method processes authorization for:
+     * - oauth 2
+     * - basic
+     * - client certificates.
+     */
+    _processAuth(request: RequestObject|null): Promise<any>|null;
+
+    /**
+     * Adds `clientCertificate` property from authorization configuration.
+     * This requires `client-certificates-model` to be present in the DOM.
+     */
+    _processClientCertificate(request: RequestObject|null): Promise<any>|null;
+
+    /**
+     * Adds `authorization` header for basic authentication.
+     */
+    _processBasicAuth(request: RequestObject|null): Promise<any>|null;
+
+    /**
+     * Processes authorization data for OAuth 2 authorization.
+     */
+    _processOAuth2(request: RequestObject|null): Promise<any>|null;
   }
 }
 
