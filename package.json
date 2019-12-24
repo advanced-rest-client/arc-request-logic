@@ -57,7 +57,7 @@
     "jexl": "^2.2.2",
     "karma": "^4.4.1",
     "lint-staged": "^9.5.0",
-    "sinon": "^8.0.0",
+    "sinon": "^8.0.1",
     "uglify-js": "^3.7.2"
   },
   "scripts": {
