@@ -1422,7 +1422,7 @@ describe('<arc-request-logic>', function() {
         element.addEventListener('transport-request', spy);
         await element.processRequest(request);
         const eventRequest = spy.args[0][0].detail;
-        assert.equal(eventRequest.headers, 'authorization: dW5hbWU6cGFzc3dk');
+        assert.equal(eventRequest.headers, 'authorization: Basic dW5hbWU6cGFzc3dk');
       });
 
       it('adds authorization header to existing headers', async () => {
@@ -1431,7 +1431,7 @@ describe('<arc-request-logic>', function() {
         element.addEventListener('transport-request', spy);
         await element.processRequest(request);
         const eventRequest = spy.args[0][0].detail;
-        assert.equal(eventRequest.headers, 'accept: */*\nauthorization: dW5hbWU6cGFzc3dk');
+        assert.equal(eventRequest.headers, 'accept: */*\nauthorization: Basic dW5hbWU6cGFzc3dk');
       });
 
       it('replaces existing authorization header', async () => {
@@ -1440,7 +1440,7 @@ describe('<arc-request-logic>', function() {
         element.addEventListener('transport-request', spy);
         await element.processRequest(request);
         const eventRequest = spy.args[0][0].detail;
-        assert.equal(eventRequest.headers, 'authorization: dW5hbWU6cGFzc3dk');
+        assert.equal(eventRequest.headers, 'authorization: Basic dW5hbWU6cGFzc3dk');
       });
     });
 

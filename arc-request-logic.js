@@ -620,7 +620,7 @@ class ArcRequestLogic extends EventsTargetMixin(HeadersParserMixin(LitElement)) 
     const { username, password } = auth;
     let headers = this.headersToJSON(request.headers || '');
     const value = btoa(`${username}:${password || ''}`);
-    headers = this.replaceHeaderValue(headers, 'authorization', value);
+    headers = this.replaceHeaderValue(headers, 'authorization', `Basic ${value}`);
     request.headers = this.headersToString(headers);
   }
 
