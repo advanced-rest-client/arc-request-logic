@@ -585,6 +585,7 @@ class ArcRequestLogic extends EventsTargetMixin(HeadersParserMixin(LitElement)) 
     const e = new CustomEvent('client-certificate-get', {
       bubbles: true,
       cancelable: true,
+      composed: true,
       detail: {
         id: auth.id
       }
