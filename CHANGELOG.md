@@ -146,3 +146,28 @@
 * updating SL configuration [3c6ee8a](https://github.com/advanced-rest-client/arc-request-logic/commit/3c6ee8a7d7b54546586021f4943d80c250f0d09f) by Pawel Psztyc
 
 
+<a name="3.0.3"></a>
+## [3.0.3](https://github.com/advanced-rest-client/arc-request-logic/compare/3.0.1...3.0.3) (2020-01-08)
+
+### Build
+
+* bumping version [b558b71](https://github.com/advanced-rest-client/arc-request-logic/commit/b558b716cd498692649c79ef229f664b44d0c072) by Pawel
+* bumping version [c524a51](https://github.com/advanced-rest-client/arc-request-logic/commit/c524a517d98490737c15b327a95dd90fab646f07) by Pawel Psztyc
+* bumping version [ce8e394](https://github.com/advanced-rest-client/arc-request-logic/commit/ce8e394cd4fe08e2cc59fa5e42bf4d4671b64e47) by Pawel Psztyc
+
+
+### Update
+
+* updating dependencies [f4eb35c](https://github.com/advanced-rest-client/arc-request-logic/commit/f4eb35c8b8d7520f1884a0288d632aedf4c46b03) by Pawel
+* [ci skip] automated merge master->stage. syncing main branches [dd3d10e](https://github.com/advanced-rest-client/arc-request-logic/commit/dd3d10ea3fca8b75247bf9f28d5c243b5dc8ab00) by Ci agent
+* updating dependencies [0bc910d](https://github.com/advanced-rest-client/arc-request-logic/commit/0bc910dd415a0bdab464bfaf7468a2bc0233daee) by Pawel Psztyc
+* [ci skip] automated merge master->stage. syncing main branches [0081b61](https://github.com/advanced-rest-client/arc-request-logic/commit/0081b6165ff385c58ceeb6b9ce621f0bf95f7cb4) by Ci agent
+
+
+### Bug Fixes
+
+* fixing removing items from responseActions array [10cd46f](https://github.com/advanced-rest-client/arc-request-logic/commit/10cd46f1debe983dea40977709a9a6339bdeab6d) by Pawel
+* making `client-certificate-get` event composed [c7d8f4c](https://github.com/advanced-rest-client/arc-request-logic/commit/c7d8f4c05977e02806f8bc486de153e8eb0187f0) by Pawel Psztyc
+* fixing basic authorization setup [ceb5aed](https://github.com/advanced-rest-client/arc-request-logic/commit/ceb5aeda5faaa24965a91ba348a7b781bc0b658f) by Pawel Psztyc
+
+
