@@ -25,6 +25,8 @@ import '@advanced-rest-client/variables-evaluator/variables-evaluator.js';
  * @property {Object=} auth
  * @property {string=} authType
  * @property {Object=} config
+ * @property {Object=} requestActions
+ * @property {Array<Object>=} responseActions
  */
 /**
  * `arc-request-logic`
@@ -510,7 +512,7 @@ class ArcRequestLogic extends EventsTargetMixin(HeadersParserMixin(LitElement)) 
     const ra = request.responseActions;
     if (ra && ra.length) {
       try {
-        await this._processResponseActions(ra, arcResponse.request, arcResponse.response);
+        await this._processResponseActions(Array.from(ra), arcResponse.request, arcResponse.response);
       } catch (_) {
         // ...
       }
@@ -519,6 +521,7 @@ class ArcRequestLogic extends EventsTargetMixin(HeadersParserMixin(LitElement)) 
   }
   /**
    * Executes response action before displaying the results.
+   * This is handled by `@advanced-rest-client/request-hooks-logic` element.
    *
    * @param {Array} actions list of actions to execute
    * @param {Request} request
@@ -674,12 +677,16 @@ class ArcRequestLogic extends EventsTargetMixin(HeadersParserMixin(LitElement)) 
    * @param {RequestObject}
    */
   /**
+   * This is handled by `@advanced-rest-client/request-hooks-logic` element.
+   *
    * @event run-response-actions
    * @param {Array<Object>} actions
    * @param {RequestObject} request
    * @param {Object} response
    */
   /**
+   * This is handled by `@advanced-rest-client/arc-models` element.
+   *
    * Dispatched when requesting client certificate data from a data store.
    * @event client-certificate-get
    * @param {String} id

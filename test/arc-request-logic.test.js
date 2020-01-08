@@ -1159,7 +1159,7 @@ describe('<arc-request-logic>', function() {
       return element._reportResponse(request, response)
       .then(() => {
         assert.isTrue(spy.called, 'Function is called');
-        assert.isTrue(spy.args[0][0] === request.responseActions, 'actions argument is set');
+        assert.deepEqual(spy.args[0][0], request.responseActions, 'actions argument is set');
         assert.deepEqual(spy.args[0][1], response.request, 'request argument is set');
         assert.deepEqual(spy.args[0][2], response.response, 'response argument is set');
       });
